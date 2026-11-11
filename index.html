@@ -59,24 +59,68 @@
         <div id="assetSlidersContainer"></div>
       </section>
 
-      <!-- Karta 2: Rok Startu, Kwota Miesięczna i Waloryzacja o Inflację -->
+      <!-- Karta 2: Data Startu, Data Zakończenia, Kwota Miesięczna i Waloryzacja o Inflację -->
       <section class="card">
         <div class="card-header">
           <div>
-            <h2 class="card-title">2. Rok Rozpoczęcia i Kwota Wpłat</h2>
-            <p class="card-subtitle">Symulacja na prawdziwych miesięcznych danych historycznych od wybranego roku</p>
+            <h2 class="card-title">2. Daty Inwestycji (Start i Koniec) oraz Wpłaty</h2>
+            <p class="card-subtitle">Wyznacz dokładny rok i miesiąc rozpoczęcia oraz zakończenia inwestycji</p>
           </div>
         </div>
 
-        <!-- Rok rozpoczęcia inwestycji -->
+        <!-- Data rozpoczęcia inwestycji (Rok + Miesiąc) -->
         <div class="form-group">
           <div class="form-label">
-            <span>Rok rozpoczęcia inwestycji <span class="info-tip" data-tip-title="Rok rozpoczęcia inwestycji" data-tip-body="Określa w którym roku kalendarzowym zaczynasz inwestować. Dla lat 2000–2026 symulator pobiera prawdziwe miesięczne zmiany cen ETF-ów, kursu USD/PLN oraz inflacji GUS z tego okresu." data-tip-hint="Wybierz np. 2000 lub 2007, aby zobaczyć jak portfel przeszedł przez wielkie krachy giełdowe.">?</span></span>
-            <span class="form-value text-blue" id="startYearVal">2010 → koniec w 2026 r.</span>
+            <span>Data rozpoczęcia inwestycji <span class="info-tip" data-tip-title="Dokładna Data Rozpoczęcia (Rok i Miesiąc)" data-tip-body="Wybierz rok oraz miesiąc pierwszego zakupu do portfela. Dla lat 2000–2026 symulator pobiera prawdziwe miesięczne zmiany cen ETF-ów, kursu USD/PLN oraz inflacji GUS z tego okresu." data-tip-hint="Możesz np. ustawić Październik 2007 (szczyt przed kryzysem 2008) lub Luty 2020 (przed krachem COVID).">?</span></span>
+            <span class="form-value text-blue" id="startDateVal">2010-01</span>
           </div>
           <div class="input-row" style="align-items:center;margin-bottom:0.4rem;">
-            <input type="number" id="startYearInput" class="input-control" value="2010" min="2000" max="2040" step="1" />
-            <input type="range" id="startYearRange" min="2000" max="2035" step="1" value="2010" />
+            <input type="number" id="startYearInput" class="input-control" value="2010" min="2000" max="2045" step="1" title="Rok rozpoczęcia" />
+            <select id="startMonthSelect" class="select-control" title="Miesiąc rozpoczęcia">
+              <option value="1" selected>01 – Styczeń</option>
+              <option value="2">02 – Luty</option>
+              <option value="3">03 – Marzec</option>
+              <option value="4">04 – Kwiecień</option>
+              <option value="5">05 – Maj</option>
+              <option value="6">06 – Czerwiec</option>
+              <option value="7">07 – Lipiec</option>
+              <option value="8">08 – Sierpień</option>
+              <option value="9">09 – Wrzesień</option>
+              <option value="10">10 – Październik</option>
+              <option value="11">11 – Listopad</option>
+              <option value="12">12 – Grudzień</option>
+            </select>
+          </div>
+          <input type="range" id="startYearRange" min="2000" max="2035" step="1" value="2010" />
+        </div>
+
+        <!-- Data zakończenia inwestycji (Rok + Miesiąc) -->
+        <div class="form-group">
+          <div class="form-label">
+            <span>Data zakończenia inwestycji <span class="info-tip" data-tip-title="Dokładna Data Zakończenia (Rok i Miesiąc)" data-tip-body="Wybierz dokładny rok oraz miesiąc zakończenia inwestycji i wyceny portfela. Jeśli wybierzesz datę do 2026-10, cała symulacja przebiega wyłącznie na historycznych danych miesięcznych. Dla dat późniejszych kolejne miesiące są losowane z bloków historycznych (lub wg prognozy)." data-tip-hint="Zmiana daty zakończenia automatycznie przelicza łączną liczbę miesięcy inwestycji.">?</span></span>
+            <span class="form-value text-blue" id="endDateVal">2026-10</span>
+          </div>
+          <div class="input-row" style="align-items:center;margin-bottom:0.4rem;">
+            <input type="number" id="endYearInput" class="input-control" value="2026" min="2000" max="2065" step="1" title="Rok zakończenia" />
+            <select id="endMonthSelect" class="select-control" title="Miesiąc zakończenia">
+              <option value="1">01 – Styczeń</option>
+              <option value="2">02 – Luty</option>
+              <option value="3">03 – Marzec</option>
+              <option value="4">04 – Kwiecień</option>
+              <option value="5">05 – Maj</option>
+              <option value="6">06 – Czerwiec</option>
+              <option value="7">07 – Lipiec</option>
+              <option value="8">08 – Sierpień</option>
+              <option value="9">09 – Wrzesień</option>
+              <option value="10" selected>10 – Październik</option>
+              <option value="11">11 – Listopad</option>
+              <option value="12">12 – Grudzień</option>
+            </select>
+          </div>
+          <input type="range" id="endYearRange" min="2001" max="2060" step="1" value="2026" />
+          <div style="margin-top:0.35rem;display:flex;justify-content:space-between;align-items:center;font-size:0.76rem;color:var(--text-secondary);">
+            <span>Czas trwania inwestycji:</span>
+            <span class="badge badge-info" id="yearsVal">16 lat i 9 mies. (201 mies.)</span>
           </div>
         </div>
 
@@ -124,14 +168,6 @@
             <option value="annual">Skokowo raz w roku (co 12 miesięcy o roczną inflację)</option>
             <option value="monthly">Płynnie co miesiąc (bieżący wskaźnik CPI)</option>
           </select>
-        </div>
-
-        <div class="form-group">
-          <div class="form-label">
-            <span>Horyzont inwestycyjny (liczba lat)</span>
-            <span class="form-value" id="yearsVal">16 lat (2010–2026)</span>
-          </div>
-          <input type="range" id="yearsRange" min="1" max="35" step="1" value="16" />
         </div>
 
         <div class="form-group">

@@ -26,11 +26,14 @@ const state = {
   },
   autoNormalize: true,
   startYear: 2010,
+  startMonth: 1,
+  endYear: 2026,
+  endMonth: 10,
   initialCapital: 10000,
   monthlyContribution: 1500,
   indexContributions: true,
   indexationMode: 'annual',
-  years: 16,
+  years: 16.75,
   baseInflation: 3.5,
   edoYear1Rate: 6.55,
   edoMargin: 1.50,
@@ -276,15 +279,58 @@ function updateAllocationBar() {
   }
 }
 
-function updatePeriodHeaderLabel() {
-  const startLabel = document.getElementById('startYearVal');
-  const yearsLabel = document.getElementById('yearsVal');
-  const endYear = state.startYear + state.years;
-  if (startLabel) {
-    startLabel.textContent = `${state.startYear} → koniec w ${endYear} r.`;
+function ensureValidDateOrder(changedSide = 'start') {
+  const startTotal = state.startYear * 12 + (state.startMonth - 1);
+  const endTotal = state.endYear * 12 + (state.endMonth - 1);
+
+  if (endTotal <= startTotal) {
+    if (changedSide === 'start') {
+      const newEnd = startTotal + 12;
+      state.endYear = Math.floor(newEnd / 12);
+      state.endMonth = (newEnd % 12) + 1;
+    } else {
+      const newStart = Math.max(2000 * 12, endTotal - 12);
+      state.startYear = Math.floor(newStart / 12);
+      state.startMonth = (newStart % 12) + 1;
+    }
   }
+
+  const totalMonths = Math.max(1, (state.endYear - state.startYear) * 12 + (state.endMonth - state.startMonth));
+  state.years = +(totalMonths / 12).toFixed(2);
+
+  // Synchronizuj kontrolki formularza
+  const syIn = document.getElementById('startYearInput');
+  const syRg = document.getElementById('startYearRange');
+  const smSel = document.getElementById('startMonthSelect');
+  const eyIn = document.getElementById('endYearInput');
+  const eyRg = document.getElementById('endYearRange');
+  const emSel = document.getElementById('endMonthSelect');
+
+  if (syIn && document.activeElement !== syIn) syIn.value = state.startYear;
+  if (syRg && document.activeElement !== syRg) syRg.value = state.startYear;
+  if (smSel && document.activeElement !== smSel) smSel.value = state.startMonth;
+  if (eyIn && document.activeElement !== eyIn) eyIn.value = state.endYear;
+  if (eyRg && document.activeElement !== eyRg) eyRg.value = state.endYear;
+  if (emSel && document.activeElement !== emSel) emSel.value = state.endMonth;
+}
+
+function updatePeriodHeaderLabel() {
+  const startLabel = document.getElementById('startDateVal');
+  const endLabel = document.getElementById('endDateVal');
+  const yearsLabel = document.getElementById('yearsVal');
+
+  const sYM = `${state.startYear}-${String(state.startMonth).padStart(2, '0')}`;
+  const eYM = `${state.endYear}-${String(state.endMonth).padStart(2, '0')}`;
+  const totalMonths = Math.max(1, (state.endYear - state.startYear) * 12 + (state.endMonth - state.startMonth));
+  const fullYears = Math.floor(totalMonths / 12);
+  const remMonths = totalMonths % 12;
+
+  if (startLabel) startLabel.textContent = sYM;
+  if (endLabel) endLabel.textContent = eYM;
   if (yearsLabel) {
-    yearsLabel.textContent = `${state.years} lat (${state.startYear}–${endYear})`;
+    const yrsPart = fullYears > 0 ? `${fullYears} lat` : '';
+    const mosPart = remMonths > 0 ? `${fullYears > 0 ? ' i ' : ''}${remMonths} mies.` : '';
+    yearsLabel.textContent = `${yrsPart}${mosPart} (${totalMonths} mies.: ${sYM} → ${eYM})`;
   }
 }
 
@@ -305,17 +351,54 @@ function bindControls() {
     normBtn.addEventListener('click', normalizeAllTo100);
   }
 
-  bindNumberAndRange('startYearInput', 'startYearRange', null, 'startYear', () => {
+  // Powiązanie dokładnych dat: Rok + Miesiąc rozpoczęcia oraz Rok + Miesiąc zakończenia
+  const onDateChange = (side) => {
+    ensureValidDateOrder(side);
     updatePeriodHeaderLabel();
+    runFullSimulation();
+  };
+
+  ['startYearInput', 'startYearRange'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('input', (e) => {
+        state.startYear = Number(e.target.value) || 2010;
+        onDateChange('start');
+      });
+    }
   });
+
+  const smEl = document.getElementById('startMonthSelect');
+  if (smEl) {
+    smEl.addEventListener('change', (e) => {
+      state.startMonth = Number(e.target.value) || 1;
+      onDateChange('start');
+    });
+  }
+
+  ['endYearInput', 'endYearRange'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('input', (e) => {
+        state.endYear = Number(e.target.value) || 2026;
+        onDateChange('end');
+      });
+    }
+  });
+
+  const emEl = document.getElementById('endMonthSelect');
+  if (emEl) {
+    emEl.addEventListener('change', (e) => {
+      state.endMonth = Number(e.target.value) || 10;
+      onDateChange('end');
+    });
+  }
 
   bindNumberAndRange('monthlyContributionInput', 'monthlyContributionRange', 'monthlyContributionVal', 'monthlyContribution', (v) => `${formatPLN(v)} / mies.`);
   bindNumberAndRange('initialCapitalInput', 'initialCapitalRange', 'initialCapitalVal', 'initialCapital', (v) => formatPLN(v));
-  bindNumberAndRange(null, 'yearsRange', null, 'years', () => {
-    updatePeriodHeaderLabel();
-  });
   bindNumberAndRange(null, 'inflationRange', 'inflationVal', 'baseInflation', (v) => `${Number(v).toFixed(1)}% rocznie`);
 
+  ensureValidDateOrder('start');
   updatePeriodHeaderLabel();
 
   const idxToggle = document.getElementById('indexContributionsToggle');
@@ -489,6 +572,9 @@ function normalizeAllTo100() {
 function runFullSimulation() {
   const marketEnv = generateMarketEnvironment({
     startYear: state.startYear,
+    startMonth: state.startMonth,
+    endYear: state.endYear,
+    endMonth: state.endMonth,
     years: state.years,
     baseInflation: state.baseInflation,
     edoYear1Rate: state.edoYear1Rate,
@@ -548,7 +634,7 @@ function runFullSimulation() {
   const empiricalRisk = analyzeHistoricalRiskAndDrawdowns(
     state.weights,
     state.edoMargin,
-    state.years,
+    Math.max(1, Math.round(state.years)),
     state.marketMode === 'historical_usd'
   );
 
@@ -581,13 +667,13 @@ function updateKPIs() {
 
   document.getElementById('kpiNetValue').textContent = formatPLN(finalNet);
   document.getElementById('kpiNetSub').innerHTML = isReal
-    ? `W ${s.endYear} r. (Nominalnie: <strong>${formatPLN(s.netFinalValue)}</strong>)`
-    : `W ${s.endYear} r. | Siła nabywcza (${s.startYear}): <strong>${formatPLN(s.realNetFinalValue)}</strong>`;
+    ? `Na koniec (${s.endYM}) | Nominalnie: <strong>${formatPLN(s.netFinalValue)}</strong>`
+    : `Na koniec (${s.endYM}) | Siła nabywcza (${s.startYM}): <strong>${formatPLN(s.realNetFinalValue)}</strong>`;
 
   document.getElementById('kpiContributed').textContent = formatPLN(contributed);
   document.getElementById('kpiContributedSub').innerHTML = state.indexContributions
-    ? `Wpłata ${s.startYear}: <strong>${formatPLN(s.initialMonthlyContribution)}</strong> → ${s.endYear}: <strong>${formatPLN(s.finalMonthlyContribution)}</strong>`
-    : `Stała wpłata (${s.startYear}–${s.endYear}): <strong>${formatPLN(s.initialMonthlyContribution)}/mies.</strong>`;
+    ? `Wpłata ${s.startYM}: <strong>${formatPLN(s.initialMonthlyContribution)}</strong> → ${s.endYM}: <strong>${formatPLN(s.finalMonthlyContribution)}</strong>`
+    : `Stała wpłata (${s.startYM} → ${s.endYM}): <strong>${formatPLN(s.initialMonthlyContribution)}/mies.</strong>`;
 
   document.getElementById('kpiProfit').textContent = formatPLN(netProfit);
   document.getElementById('kpiProfitSub').innerHTML = `Mnożnik: <span class="badge badge-success">${multiplier}x</span> | CAGR: <strong>${s.cagr.toFixed(2)}%</strong> | MaxDD: <strong class="text-rose">${s.maxDrawdown.toFixed(1)}%</strong>`;
@@ -625,19 +711,19 @@ function updateInflationSummaryBox() {
   if (state.indexContributions) {
     box.innerHTML = `
       <div>
-        <strong>Okres: ${sIdx.startYear}–${sIdx.endYear} (${state.years} lat, dane miesięczne) | Waloryzacja wpłat o inflację AKTYWNA:</strong>
-        Zaczynasz w <strong>${sIdx.startYear} r.</strong> od wpłaty <strong>${formatPLN(sIdx.initialMonthlyContribution)}/mies.</strong>
-        W <strong>${sIdx.endYear} r.</strong> zwaloryzowana wpłata wynosi <strong>${formatPLN(sIdx.finalMonthlyContribution)}/mies.</strong>
+        <strong>Okres inwestycji: ${sIdx.startYM} → ${sIdx.endYM} (${sIdx.totalMonths} mies.) | Waloryzacja wpłat o inflację AKTYWNA:</strong>
+        Zaczynasz w <strong>${sIdx.startYM}</strong> od wpłaty <strong>${formatPLN(sIdx.initialMonthlyContribution)}/mies.</strong>
+        W <strong>${sIdx.endYM}</strong> zwaloryzowana wpłata wynosi <strong>${formatPLN(sIdx.finalMonthlyContribution)}/mies.</strong>
         Dzięki waloryzacji wpłat Twój portfel końcowy netto jest wyższy o <strong class="text-emerald">+${formatPLN(diffNet)}</strong> niż przy niezmiennej kwocie przelewu!
       </div>
     `;
   } else {
     box.innerHTML = `
       <div>
-        <strong>Okres: ${sIdx.startYear}–${sIdx.endYear} (${state.years} lat, dane miesięczne) | Waloryzacja wpłat WYŁĄCZONA:</strong>
-        Wpłacasz stałe nominalne <strong>${formatPLN(sIdx.initialMonthlyContribution)}/mies.</strong> przez cały okres ${sIdx.startYear}–${sIdx.endYear}.
-        Przez inflację realna siła nabywcza Twojej miesięcznej wpłaty w ${sIdx.endYear} r. spadła do
-        <strong class="text-amber">${formatPLN(sIdx.initialMonthlyContribution / sIdx.finalInflationFactor)}</strong> w pieniądzach z ${sIdx.startYear} roku.
+        <strong>Okres inwestycji: ${sIdx.startYM} → ${sIdx.endYM} (${sIdx.totalMonths} mies.) | Waloryzacja wpłat WYŁĄCZONA:</strong>
+        Wpłacasz stałe nominalne <strong>${formatPLN(sIdx.initialMonthlyContribution)}/mies.</strong> przez cały okres ${sIdx.startYM} → ${sIdx.endYM}.
+        Przez inflację realna siła nabywcza Twojej miesięcznej wpłaty w ${sIdx.endYM} spadła do
+        <strong class="text-amber">${formatPLN(sIdx.initialMonthlyContribution / sIdx.finalInflationFactor)}</strong> w pieniądzach z ${sIdx.startYM}.
       </div>
     `;
   }

@@ -161,7 +161,10 @@ function createSeededRandom(seed = 42) {
 export function generateMarketEnvironment(params) {
   const {
     startYear = 2010,
-    years = 16,
+    startMonth = 1,
+    endYear = 2026,
+    endMonth = 10,
+    years,
     baseInflation = 3.5,
     edoYear1Rate = 6.55,
     edoMargin = 1.50,
@@ -170,7 +173,16 @@ export function generateMarketEnvironment(params) {
     seed = 1337
   } = params;
 
-  const totalMonths = years * 12;
+  const computedMonths = (endYear !== undefined && endMonth !== undefined)
+    ? (endYear - startYear) * 12 + (endMonth - startMonth)
+    : (years || 16) * 12;
+  const totalMonths = Math.max(1, computedMonths);
+  const startYM = `${startYear}-${String(startMonth).padStart(2, '0')}`;
+  const endAbs = startYear * 12 + (startMonth - 1) + totalMonths;
+  const actualEndYear = Math.floor(endAbs / 12);
+  const actualEndMonth = (endAbs % 12) + 1;
+  const endYM = `${actualEndYear}-${String(actualEndMonth).padStart(2, '0')}`;
+
   const rng = createSeededRandom(seed);
 
   const monthlyInflation = [];
@@ -185,9 +197,9 @@ export function generateMarketEnvironment(params) {
   let bootstrapCursor = 0;
 
   for (let m = 0; m < totalMonths; m++) {
-    const yearOffset = Math.floor(m / 12);
-    const monthInYear = (m % 12) + 1;
-    const currentCalendarYear = startYear + yearOffset;
+    const absMonth = startYear * 12 + (startMonth - 1) + m + 1;
+    const currentCalendarYear = Math.floor(absMonth / 12);
+    const monthInYear = (absMonth % 12) + 1;
     const ymKey = `${currentCalendarYear}-${String(monthInYear).padStart(2, '0')}`;
     monthlyDates.push(ymKey);
 
@@ -229,6 +241,11 @@ export function generateMarketEnvironment(params) {
 
   return {
     startYear,
+    startMonth,
+    endYear: actualEndYear,
+    endMonth: actualEndMonth,
+    startYM,
+    endYM,
     totalMonths,
     monthlyDates,
     monthlyInflation,
@@ -257,6 +274,11 @@ export function simulatePortfolio(config, marketEnv) {
 
   const {
     startYear = 2010,
+    startMonth = 1,
+    endYear = 2026,
+    endMonth = 10,
+    startYM = `${startYear}-${String(startMonth).padStart(2, '0')}`,
+    endYM = `${endYear}-${String(endMonth).padStart(2, '0')}`,
     totalMonths,
     monthlyDates,
     monthlyInflation,
@@ -356,10 +378,10 @@ export function simulatePortfolio(config, marketEnv) {
   // Śledzenie jednostki portfela TWR (Time-Weighted Return NAV = 100 na starcie) oraz szczytu kapitałowego
   let unitNav = 100.0;
   let unitPeak = 100.0;
-  let unitPeakDate = `${startYear}-01`;
+  let unitPeakDate = startYM;
   let maxUnitDrawdown = 0;
-  let maxDrawdownPeakDate = `${startYear}-01`;
-  let maxDrawdownTroughDate = `${startYear}-01`;
+  let maxDrawdownPeakDate = startYM;
+  let maxDrawdownTroughDate = startYM;
 
   let capitalPeakAdjusted = initialCapital;
   let maxCapitalDrawdown = 0;
@@ -381,8 +403,8 @@ export function simulatePortfolio(config, marketEnv) {
     month: 0,
     year: 0,
     calendarYear: startYear,
-    ym: `${startYear}-01`,
-    label: `${startYear}-01`,
+    ym: startYM,
+    label: startYM,
     contributedNominal: initialCapital,
     contributedReal: initialCapital,
     monthlyContributionActual: monthlyContribution,
@@ -649,8 +671,13 @@ export function simulatePortfolio(config, marketEnv) {
     timeline,
     summary: {
       startYear,
-      endYear: startYear + years,
-      years,
+      startMonth,
+      endYear,
+      endMonth,
+      startYM,
+      endYM,
+      totalMonths,
+      years: +(totalMonths / 12).toFixed(2),
       contributedNominal: finalPoint.contributedNominal,
       contributedReal: finalPoint.contributedReal,
       initialMonthlyContribution: monthlyContribution,
