@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Wizualizator Portfela Inwestycyjnego – Prawdziwe Dane Miesięczne ETF (2000–2026) &amp; Obligacje EDO</title>
+  <title>Wizualizator Portfela Inwestycyjnego – Prawdziwe Dane Miesięczne ETF (1985–2026) &amp; Obligacje EDO</title>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
@@ -12,8 +12,8 @@
       <div class="brand">
         <div class="brand-icon">📈</div>
         <div class="brand-title">
-          <h1>Wizualizator Portfela Inwestycyjnego ETF &amp; EDO (Dane Miesięczne 2000–2026)</h1>
-          <p>Prawdziwe szeregi miesięczne: S&amp;P 500, Nasdaq-100, MSCI World, MSCI World Momentum, MSCI ACWI, Obligacje EDO + Analiza Obsunięć i Podatków</p>
+          <h1>Wizualizator Portfela Inwestycyjnego ETF &amp; EDO (Dane Miesięczne 1985–2026)</h1>
+          <p>42 lata prawdziwych szeregów miesięcznych (501 mies.): S&amp;P 500, Nasdaq-100, MSCI World, MSCI World Momentum, MSCI ACWI, Obligacje EDO + Analiza Obsunięć i Podatków</p>
         </div>
       </div>
 
@@ -71,11 +71,11 @@
         <!-- Data rozpoczęcia inwestycji (Rok + Miesiąc) -->
         <div class="form-group">
           <div class="form-label">
-            <span>Data rozpoczęcia inwestycji <span class="info-tip" data-tip-title="Dokładna Data Rozpoczęcia (Rok i Miesiąc)" data-tip-body="Wybierz rok oraz miesiąc pierwszego zakupu do portfela. Dla lat 2000–2026 symulator pobiera prawdziwe miesięczne zmiany cen ETF-ów, kursu USD/PLN oraz inflacji GUS z tego okresu." data-tip-hint="Możesz np. ustawić Październik 2007 (szczyt przed kryzysem 2008) lub Luty 2020 (przed krachem COVID).">?</span></span>
+            <span>Data rozpoczęcia inwestycji <span class="info-tip" data-tip-title="Dokładna Data Rozpoczęcia (Rok i Miesiąc: od 1985 r.)" data-tip-body="Wybierz rok oraz miesiąc pierwszego zakupu do portfela. Dla lat 1985–2026 (501 miesięcy) symulator pobiera prawdziwe miesięczne zmiany cen indeksów/ETF-ów, kursu USD/PLN oraz inflacji." data-tip-hint="Możesz sprawdzić np. październik 1987 (Czarny Poniedziałek), marzec 2000 (Bańka Dot-Com) lub październik 2007 (Kryzys 2008).">?</span></span>
             <span class="form-value text-blue" id="startDateVal">2010-01</span>
           </div>
           <div class="input-row" style="align-items:center;margin-bottom:0.4rem;">
-            <input type="number" id="startYearInput" class="input-control" value="2010" min="2000" max="2045" step="1" title="Rok rozpoczęcia" />
+            <input type="number" id="startYearInput" class="input-control" value="2010" min="1985" max="2045" step="1" title="Rok rozpoczęcia" />
             <select id="startMonthSelect" class="select-control" title="Miesiąc rozpoczęcia">
               <option value="1" selected>01 – Styczeń</option>
               <option value="2">02 – Luty</option>
@@ -91,17 +91,17 @@
               <option value="12">12 – Grudzień</option>
             </select>
           </div>
-          <input type="range" id="startYearRange" min="2000" max="2035" step="1" value="2010" />
+          <input type="range" id="startYearRange" min="1985" max="2035" step="1" value="2010" />
         </div>
 
         <!-- Data zakończenia inwestycji (Rok + Miesiąc) -->
         <div class="form-group">
           <div class="form-label">
-            <span>Data zakończenia inwestycji <span class="info-tip" data-tip-title="Dokładna Data Zakończenia (Rok i Miesiąc)" data-tip-body="Wybierz dokładny rok oraz miesiąc zakończenia inwestycji i wyceny portfela. Jeśli wybierzesz datę do 2026-10, cała symulacja przebiega wyłącznie na historycznych danych miesięcznych. Dla dat późniejszych kolejne miesiące są losowane z bloków historycznych (lub wg prognozy)." data-tip-hint="Zmiana daty zakończenia automatycznie przelicza łączną liczbę miesięcy inwestycji.">?</span></span>
+            <span>Data zakończenia inwestycji <span class="info-tip" data-tip-title="Dokładna Data Zakończenia (Rok i Miesiąc)" data-tip-body="Wybierz dokładny rok oraz miesiąc zakończenia inwestycji i wyceny portfela. Jeśli wybierzesz datę do 2026-10, cała symulacja przebiega wyłącznie na historycznych danych miesięcznych (od 1985 r.). Dla dat późniejszych kolejne miesiące są losowane z bloków historycznych." data-tip-hint="Zmiana daty zakończenia automatycznie przelicza łączną liczbę miesięcy inwestycji.">?</span></span>
             <span class="form-value text-blue" id="endDateVal">2026-10</span>
           </div>
           <div class="input-row" style="align-items:center;margin-bottom:0.4rem;">
-            <input type="number" id="endYearInput" class="input-control" value="2026" min="2000" max="2065" step="1" title="Rok zakończenia" />
+            <input type="number" id="endYearInput" class="input-control" value="2026" min="1985" max="2065" step="1" title="Rok zakończenia" />
             <select id="endMonthSelect" class="select-control" title="Miesiąc zakończenia">
               <option value="1">01 – Styczeń</option>
               <option value="2">02 – Luty</option>
@@ -117,7 +117,7 @@
               <option value="12">12 – Grudzień</option>
             </select>
           </div>
-          <input type="range" id="endYearRange" min="2001" max="2060" step="1" value="2026" />
+          <input type="range" id="endYearRange" min="1986" max="2060" step="1" value="2026" />
           <div style="margin-top:0.35rem;display:flex;justify-content:space-between;align-items:center;font-size:0.76rem;color:var(--text-secondary);">
             <span>Czas trwania inwestycji:</span>
             <span class="badge badge-info" id="yearsVal">16 lat i 9 mies. (201 mies.)</span>
@@ -223,9 +223,9 @@
             <button type="button" class="btn btn-sm" id="btnNewRandomSeed" style="display:none;">🎲 Losuj bloki historyczne</button>
           </div>
           <select id="marketModeSelect" class="select-control">
-            <option value="historical">Rzeczywiste dane miesięczne ETF w PLN (2000–2026 z kursem USD/PLN)</option>
-            <option value="historical_usd">Rzeczywiste dane miesięczne ETF w walucie bazowej USD (bez wpływu kursu PLN)</option>
-            <option value="bootstrap">Empiryczny Block Bootstrap (Losowanie prawdziwych bloków rocznych z lat 2000–2026)</option>
+            <option value="historical">Rzeczywiste dane miesięczne ETF w PLN (1985–2026 z kursem USD/PLN)</option>
+            <option value="historical_usd">Rzeczywiste dane miesięczne ETF w walucie bazowej USD (1985–2026 bez wpływu PLN)</option>
+            <option value="bootstrap">Empiryczny Block Bootstrap (Losowanie prawdziwych bloków rocznych z lat 1985–2026)</option>
             <option value="deterministic">Teoretyczny gładki CAGR (Tylko dla odniesienia matematycznego)</option>
           </select>
         </div>
@@ -317,7 +317,7 @@
             <button type="button" class="view-tab active" data-charttab="wealth" data-tip-title="Wykres Wzrostu Portfela" data-tip-body="Porównuje wartość Twojego portfela Netto (po podatku), Brutto (przed podatkiem), wybrany Benchmark oraz sumę wpłaconych pieniędzy w każdym miesiącu." data-tip-hint="Najedź kursorem na wykres, aby sprawdzić dokładne kwoty w wybranym miesiącu.">📈 Wzrost Portfela (Rzeczywisty)</button>
             <button type="button" class="view-tab" data-charttab="compare_strategies" data-tip-title="Porównanie 7 Strategii" data-tip-body="Zestawia Twój portfel z 6 popularnymi strategiami (100% Momentum, 100% S&P 500, 100% Nasdaq-100, 100% ACWI, 60/40 oraz 100% EDO) na dokładnie tych samych danych rynkowych." data-tip-hint="Pozwala szybko ocenić, czy Twoja mieszanka bije pojedyncze indeksy.">🏆 Porównanie 7 Strategii</button>
             <button type="button" class="view-tab" data-charttab="drawdown" data-tip-title="Wykres Obsunięć Kapitału (Underwater Chart)" data-tip-body="Pokazuje o ile procent w danym miesiącu portfel znajdował się poniżej swojego wcześniejszego szczytu (0% oznacza nowy rekord wartości jednostki portfela)." data-tip-hint="Im płytsze i krótsze są 'dołki' pod kreską 0%, tym spokojniej śpisz podczas kryzysów.">📉 Obsunięcia Kapitału (Underwater)</button>
-            <button type="button" class="view-tab" data-charttab="yearly_bars" data-tip-title="Roczne Stopy Zwrotu (2000–2026)" data-tip-body="Zestawienie rzeczywistych wyników Twojego portfela w każdym pojedynczym roku kalendarzowym od 2000 do 2026 roku." data-tip-hint="Zielone słupki oznaczają lata zyskowne, a czerwone lata stratne.">📊 Stopy Roczne (2000–2026)</button>
+            <button type="button" class="view-tab" data-charttab="yearly_bars" data-tip-title="Roczne Stopy Zwrotu (1985–2026)" data-tip-body="Zestawienie rzeczywistych wyników Twojego portfela w każdym pojedynczym roku kalendarzowym od 1985 do 2026 roku (42 lata)." data-tip-hint="Zielone słupki oznaczają lata zyskowne, a czerwone lata stratne.">📊 Stopy Roczne (1985–2026)</button>
             <button type="button" class="view-tab" data-charttab="breakdown" data-tip-title="Struktura Aktywów w Czasie" data-tip-body="Wykres warstwowy pokazujący, jaką część portfela w każdym miesiącu stanowiły poszczególne ETF-y oraz obligacje skarbowe EDO." data-tip-hint="Widać tu jak obligacje EDO stabilizują wartość portfela, gdy warstwy akcyjne się kurczą.">🧱 Struktura Aktywów</button>
           </div>
 
@@ -345,15 +345,15 @@
         <div id="mainChartLegend" class="chart-legend"></div>
       </section>
 
-      <!-- SEKCJA: GŁĘBOKA ANALIZA OBSUNIĘĆ (DRAWDOWN), SZANSY NA SPADKI I OKIEN HISTORYCZNYCH (2000–2026) -->
+      <!-- SEKCJA: GŁĘBOKA ANALIZA OBSUNIĘĆ (DRAWDOWN), SZANSY NA SPADKI I OKIEN HISTORYCZNYCH (1985–2026) -->
       <section class="card">
         <div class="card-header">
           <div>
             <h2 class="card-title">
-              🛡️ Analiza Obsunięć (Drawdown), Prawdopodobieństwa Spadków i Statystyk Ryzyka (Dane Historyczne 2000–2026)
-              <span class="info-tip" data-tip-title="Jak działa analiza empiryczna 2000–2026?" data-tip-body="Symulator bierze wybrane przez Ciebie proporcje ETF-ów i EDO, a następnie testuje je na wszystkich 321 prawdziwych miesiącach od lutego 2000 do października 2026 r. Dzięki temu szansa na obsunięcie nie jest zgadywana z rozkładu normalnego, lecz wynika z prawdziwych krachów (2000, 2008, 2020, 2022)." data-tip-hint="Najedź na ikonki '?' przy poszczególnych wskaźnikach poniżej, aby poznać ich dokładne znaczenie.">?</span>
+              🛡️ Analiza Obsunięć (Drawdown), Prawdopodobieństwa Spadków i Statystyk Ryzyka (Dane Historyczne 1985–2026)
+              <span class="info-tip" data-tip-title="Jak działa analiza empiryczna 1985–2026?" data-tip-body="Symulator bierze wybrane przez Ciebie proporcje ETF-ów i EDO, a następnie testuje je na wszystkich 501 prawdziwych miesiącach od lutego 1985 do października 2026 r. (42 lata!). Dzięki temu szansa na obsunięcie wynika z prawdziwych historycznych krachów (Czarny Poniedziałek 1987, 2000, 2008, 2020, 2022)." data-tip-hint="Najedź na ikonki '?' przy poszczególnych wskaźnikach poniżej, aby poznać ich dokładne znaczenie.">?</span>
             </h2>
-            <p class="card-subtitle">Obliczone na podstawie 321 prawdziwych miesięcy rynkowych (obejmujących Bańkę Dot-Com 2000–2002, Kryzys 2008, COVID 2020 i Bessę Inflacyjną 2022)</p>
+            <p class="card-subtitle">Obliczone na podstawie 501 prawdziwych miesięcy rynkowych (obejmujących Krach 1987, Bańkę Dot-Com 2000–2002, Kryzys 2008, COVID 2020 i Bessę 2022)</p>
           </div>
         </div>
 

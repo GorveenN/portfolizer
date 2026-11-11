@@ -162,7 +162,7 @@ function renderAssetSliders() {
     row.className = 'asset-row';
     const rateLabel = asset.id === 'edo'
       ? `1. rok: ${state.edoYear1Rate}% | Lata 2-10: Inflacja GUS + ${state.edoMargin}%`
-      : `Dane miesięczne 2000–2026 | TER: ${asset.ter}%`;
+      : `Dane miesięczne 1985–2026 (501 mies.) | TER: ${asset.ter}%`;
 
     row.innerHTML = `
       <div class="asset-top">
@@ -243,7 +243,7 @@ function updateSlidersUI() {
     if (metaEl) {
       metaEl.textContent = id === 'edo'
         ? `1. rok: ${state.edoYear1Rate}% | Lata 2-10: Inflacja GUS + ${state.edoMargin}%`
-        : `Dane miesięczne 2000–2026 | TER: ${ASSETS[id].ter}%`;
+        : `Dane miesięczne 1985–2026 (501 mies.) | TER: ${ASSETS[id].ter}%`;
     }
   });
   updateAllocationBar();
@@ -289,7 +289,7 @@ function ensureValidDateOrder(changedSide = 'start') {
       state.endYear = Math.floor(newEnd / 12);
       state.endMonth = (newEnd % 12) + 1;
     } else {
-      const newStart = Math.max(2000 * 12, endTotal - 12);
+      const newStart = Math.max(1985 * 12 + 1, endTotal - 12);
       state.startYear = Math.floor(newStart / 12);
       state.startMonth = (newStart % 12) + 1;
     }
@@ -841,7 +841,7 @@ function updateRiskAndDrawdownSection() {
   const rwTitle = document.getElementById('rollingWindowsTitle');
   const rwBox = document.getElementById('rollingWindowsSummaryBox');
   if (rwTitle) {
-    rwTitle.textContent = `🔄 Test wszystkich ${empiricalRisk.totalRollingWindows} historycznych okresów ${empiricalRisk.effectiveWindowYears}-letnich (2000–2026)`;
+    rwTitle.textContent = `🔄 Test wszystkich ${empiricalRisk.totalRollingWindows} historycznych okresów ${empiricalRisk.effectiveWindowYears}-letnich (1985–2026)`;
   }
   if (rwBox && empiricalRisk.bestWindow && empiricalRisk.worstWindow) {
     const bw = empiricalRisk.bestWindow;

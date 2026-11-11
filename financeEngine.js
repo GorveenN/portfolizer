@@ -727,11 +727,11 @@ export function analyzeHistoricalRiskAndDrawdowns(weights, edoMargin = 1.5, hori
     normW[k] = Number(weights[k] || 0) / weightSum;
   });
 
-  // 1. Zbuduj pełny 321-miesięczny szereg zwrotów wybranego portfela (2000-02..2026-10)
+  // 1. Zbuduj pełny 501-miesięczny szereg zwrotów wybranego portfela (1985-02..2026-10)
   const monthlySeries = [];
   let nav = 100.0;
   let peak = 100.0;
-  let peakYM = '2000-01';
+  let peakYM = '1985-01';
 
   // Lista epizodów obsunięć
   const episodes = [];
@@ -826,8 +826,8 @@ export function analyzeHistoricalRiskAndDrawdowns(weights, edoMargin = 1.5, hori
     { threshold: 40, label: 'Głęboki krach ≥ 40%', probAnnual: calcProb(rolling12MaxDDs, 40) }
   ];
 
-  // 3. Analiza kroczących okien historycznych (Rolling Windows) o długości wybranej przez użytkownika (ograniczonej do maks. 15 lat dla liczebności próby)
-  const effectiveWindowYears = Math.max(1, Math.min(15, horizonYears));
+  // 3. Analiza kroczących okien historycznych (Rolling Windows) o długości wybranej przez użytkownika (do maks. 25 lat na 42-letniej próbie 1985-2026)
+  const effectiveWindowYears = Math.max(1, Math.min(25, horizonYears));
   const windowMonths = effectiveWindowYears * 12;
   const rollingWindows = [];
 
