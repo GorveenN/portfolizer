@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wizualizator Portfela Inwestycyjnego – Prawdziwe Dane Miesięczne ETF (2000–2026) &amp; Obligacje EDO</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="brand">
+        <div class="brand-icon">📈</div>
+        <div class="brand-title">
+          <h1>Wizualizator Portfela Inwestycyjnego ETF &amp; EDO (Dane Miesięczne 2000–2026)</h1>
+          <p>Prawdziwe szeregi miesięczne: S&amp;P 500, Nasdaq-100, MSCI World, MSCI World Momentum, MSCI ACWI, Obligacje EDO + Analiza Obsunięć i Podatków</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <div class="view-tabs">
+          <button type="button" class="view-tab active" data-valmode="nominal" data-tip-title="Wartości Nominalne (PLN)" data-tip-body="Kwoty w złotówkach bez korygowania o inflację – dokładnie tyle nominalnie zobaczysz na rachunku maklerskim w danym roku." data-tip-hint="Przełącz na Wartości Realne, aby sprawdzić dzisiejszą siłę nabywczą tych pieniędzy.">Wartości Nominalne (PLN)</button>
+          <button type="button" class="view-tab" data-valmode="real" data-tip-title="Wartości Realne (Skorygowane o inflację)" data-tip-body="Kwoty przeliczone na siłę nabywczą pieniądza z roku startu inwestycji (zdyskontowane o skumulowaną inflację CPI)." data-tip-hint="Pokazuje ile realnie towarów i usług kupisz za zgromadzony kapitał.">Wartości Realne (Siła nabywcza na starcie)</button>
+        </div>
+        <button type="button" class="btn btn-primary" id="btnExportCSV">⬇ Eksportuj CSV</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-container">
+    <!-- LEWA KOLUMNA: KONFIGURATOR PORTFELA I PARAMETRÓW -->
+    <aside class="sidebar-controls">
+      <!-- Karta 1: Szablony i Alokacja Aktywów -->
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">1. Skład Portfela i Strategie</h2>
+            <p class="card-subtitle">Wybierz gotową strategię lub wymieszaj ETF-y (w tym MSCI World Momentum) i obligacje EDO</p>
+          </div>
+        </div>
+
+        <div class="preset-grid" id="presetGrid"></div>
+
+        <div class="alloc-bar-wrapper">
+          <div class="alloc-bar" id="allocBar"></div>
+          <div class="alloc-status">
+            <span id="allocSumBadge" class="badge badge-success">Suma wag: 100%</span>
+            <div style="display:flex;align-items:center;gap:0.6rem;">
+              <label style="display:flex;align-items:center;gap:0.3rem;cursor:pointer;font-size:0.74rem;color:var(--text-secondary);">
+                <input type="checkbox" id="autoNormalizeCheck" checked />
+                Auto-100%
+                <span class="info-tip" data-tip-title="Automatyczne dopasowanie do 100%" data-tip-body="Gdy przesuwasz suwak wybranego ETF-u lub obligacji EDO, pozostałe aktywa w portfelu są proporcjonalnie skalowane, aby suma zawsze wynosiła 100%." data-tip-hint="Możesz odznaczyć tę opcję, aby ustawić wagi ręcznie i kliknąć 'Wyrównaj do 100%'.">?</span>
+              </label>
+              <button type="button" class="btn btn-sm" id="btnNormalize100">Wyrównaj do 100%</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="assetSlidersContainer"></div>
+      </section>
+
+      <!-- Karta 2: Rok Startu, Kwota Miesięczna i Waloryzacja o Inflację -->
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">2. Rok Rozpoczęcia i Kwota Wpłat</h2>
+            <p class="card-subtitle">Symulacja na prawdziwych miesięcznych danych historycznych od wybranego roku</p>
+          </div>
+        </div>
+
+        <!-- Rok rozpoczęcia inwestycji -->
+        <div class="form-group">
+          <div class="form-label">
+            <span>Rok rozpoczęcia inwestycji <span class="info-tip" data-tip-title="Rok rozpoczęcia inwestycji" data-tip-body="Określa w którym roku kalendarzowym zaczynasz inwestować. Dla lat 2000–2026 symulator pobiera prawdziwe miesięczne zmiany cen ETF-ów, kursu USD/PLN oraz inflacji GUS z tego okresu." data-tip-hint="Wybierz np. 2000 lub 2007, aby zobaczyć jak portfel przeszedł przez wielkie krachy giełdowe.">?</span></span>
+            <span class="form-value text-blue" id="startYearVal">2010 → koniec w 2026 r.</span>
+          </div>
+          <div class="input-row" style="align-items:center;margin-bottom:0.4rem;">
+            <input type="number" id="startYearInput" class="input-control" value="2010" min="2000" max="2040" step="1" />
+            <input type="range" id="startYearRange" min="2000" max="2035" step="1" value="2010" />
+          </div>
+        </div>
+
+        <!-- Kwota wpłacana co miesiąc -->
+        <div class="form-group">
+          <div class="form-label">
+            <span>Kwota wpłacana co miesiąc (bazowa) <span class="info-tip" data-tip-title="Regularna wpłata miesięczna (DCA)" data-tip-body="Kwota, którą dopłacasz do portfela na początku każdego miesiąca (strategia Dollar-Cost Averaging – uśrednianie ceny zakupu)." data-tip-hint="Przy włączonej waloryzacji ta kwota rośnie z czasem o wskaźnik inflacji.">?</span></span>
+            <span class="form-value text-emerald" id="monthlyContributionVal">1 500 zł / mies.</span>
+          </div>
+          <div class="input-row" style="align-items:center;margin-bottom:0.4rem;">
+            <input type="number" id="monthlyContributionInput" class="input-control" value="1500" min="0" max="100000" step="100" />
+            <input type="range" id="monthlyContributionRange" min="0" max="25000" step="100" value="1500" />
+          </div>
+        </div>
+
+        <!-- Kapitał początkowy -->
+        <div class="form-group">
+          <div class="form-label">
+            <span>Kapitał początkowy (jednorazowo na start)</span>
+            <span class="form-value" id="initialCapitalVal">10 000 zł</span>
+          </div>
+          <div class="input-row" style="align-items:center;margin-bottom:0.4rem;">
+            <input type="number" id="initialCapitalInput" class="input-control" value="10000" min="0" max="5000000" step="500" />
+            <input type="range" id="initialCapitalRange" min="0" max="250000" step="1000" value="10000" />
+          </div>
+        </div>
+
+        <!-- Waloryzacja wpłat o inflację -->
+        <div class="toggle-box">
+          <div class="toggle-info">
+            <h4>Waloryzuj miesięczną wpłatę o inflację <span class="info-tip" data-tip-title="Waloryzacja wpłat o inflację" data-tip-body="Jeśli dziś wpłacasz 1500 zł, a inflacja wynosi 5%, to za rok musisz wpłacić 1575 zł, aby zainwestować dokładnie taką samą realną wartość pieniądza." data-tip-hint="Chroni Twój plan oszczędzania przed utratą realnej wartości dopłat w długim terminie.">?</span></h4>
+            <p>Zwiększa wpłatę wraz z rzeczywistą inflacją GUS, aby co miesiąc inwestować tę samą siłę nabywczą.</p>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="indexContributionsToggle" checked />
+            <span class="slider-toggle"></span>
+          </label>
+        </div>
+
+        <div class="form-group">
+          <div class="form-label">
+            <span>Tryb indeksacji wpłat</span>
+          </div>
+          <select id="indexationModeSelect" class="select-control">
+            <option value="annual">Skokowo raz w roku (co 12 miesięcy o roczną inflację)</option>
+            <option value="monthly">Płynnie co miesiąc (bieżący wskaźnik CPI)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <div class="form-label">
+            <span>Horyzont inwestycyjny (liczba lat)</span>
+            <span class="form-value" id="yearsVal">16 lat (2010–2026)</span>
+          </div>
+          <input type="range" id="yearsRange" min="1" max="35" step="1" value="16" />
+        </div>
+
+        <div class="form-group">
+          <div class="form-label">
+            <span>Inflacja bazowa dla lat przyszłych (&gt;2026)</span>
+            <span class="form-value" id="inflationVal">3.5% rocznie</span>
+          </div>
+          <input type="range" id="inflationRange" min="0" max="12" step="0.1" value="3.5" />
+        </div>
+      </section>
+
+      <!-- Karta 3: Podatki, Rebalancing i Źródło Danych -->
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">3. Podatki (Belka 19% / IKE / IKZE) i Dane</h2>
+            <p class="card-subtitle">Prawdziwe szeregi czasowe z Yahoo Finance + polskie podatki</p>
+          </div>
+        </div>
+
+        <div class="form-label">
+          <span>Typ konta inwestycyjnego: <span class="info-tip" data-tip-title="Opodatkowanie: Zwykłe vs IKE vs IKZE" data-tip-body="• Zwykłe: 19% podatku Belki od zysku przy wypłacie końcowej oraz przy każdym 10-letnim rolowaniu obligacji EDO.<br>• IKE: 0% podatku Belki (zarówno od ETF, jak i przy rolowaniu EDO po 10 latach).<br>• IKZE: Co roku odliczasz wpłaty od podstawy opodatkowania PIT (zwrot 12%, 19% lub 32% jest reinwestowany), a na końcu płacisz zryczałtowane 10%." data-tip-hint="Konto IKE przy długim horyzoncie potrafi zaoszczędzić dziesiątki lub setki tysięcy złotych podatku.">?</span></span>
+        </div>
+        <div class="tax-tabs">
+          <button type="button" class="tax-tab active" data-tax="standard">Zwykłe (19% Belki)</button>
+          <button type="button" class="tax-tab" data-tax="ike">Konto IKE (0%)</button>
+          <button type="button" class="tax-tab" data-tax="ikze">Konto IKZE (PIT)</button>
+        </div>
+
+        <div id="ikzeOptionsBox" style="display:none;margin-bottom:0.85rem;">
+          <div class="form-label"><span>Twój próg podatkowy PIT (zwrot z IKZE jest reinwestowany):</span></div>
+          <select id="ikzeBracketSelect" class="select-control">
+            <option value="12">12% (I próg podatkowy)</option>
+            <option value="19">19% (Podatek liniowy B2B)</option>
+            <option value="32">32% (II próg podatkowy)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <div class="form-label">
+            <span>Strategia Rebalancingu (utrzymywania wag): <span class="info-tip" data-tip-title="Rebalancing Portfela" data-tip-body="Z czasem akcje rosną szybciej niż obligacje, zmieniając proporcje portfela.<br>• Smart DCA: nowe miesięczne wpłaty trafiają w te aktywa, których brakuje do wag docelowych – nie wymaga sprzedaży i nie generuje podatku Belki w trakcie!<br>• Pełny roczny: raz w roku sprzedaje nadwyżki (na zwykłym koncie generuje 19% podatku od zrealizowanego zysku)." data-tip-hint="Na koncie opodatkowanym najkorzystniejszy podatkowo jest Smart DCA (rebalancing dopłatami).">?</span></span>
+          </div>
+          <select id="rebalanceSelect" class="select-control">
+            <option value="contributions">Smart DCA – Rebalancing nowymi wpłatami (0 zł podatku w trakcie)</option>
+            <option value="annual_sell">Pełny Rebalancing raz w roku (sprzedaż nadwyżek z podatkiem na koncie zwykłym)</option>
+            <option value="none">Brak rebalancingu (każda wpłata dzielona wg wag początkowych)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <div class="form-label">
+            <span>Tryb danych rynkowych: <span class="info-tip" data-tip-title="Tryby Danych Rynkowych" data-tip-body="• Rzeczywiste w PLN: prawdziwe miesięczne zwroty ETF z Yahoo Finance przeliczone po historycznym kursie USD/PLN (pokazuje efekt ochronny złotówki w kryzysach).<br>• Rzeczywiste w USD: czyste miesięczne zwroty indeksów w dolarze.<br>• Block Bootstrap: losuje prawdziwe 12-miesięczne bloki z lat 2000–2026, zachowując realne krachy i zmienność dla prognoz w przyszłość." data-tip-hint="Domyślny tryb używa w 100% prawdziwych danych miesięcznych z rynku.">?</span></span>
+            <button type="button" class="btn btn-sm" id="btnNewRandomSeed" style="display:none;">🎲 Losuj bloki historyczne</button>
+          </div>
+          <select id="marketModeSelect" class="select-control">
+            <option value="historical">Rzeczywiste dane miesięczne ETF w PLN (2000–2026 z kursem USD/PLN)</option>
+            <option value="historical_usd">Rzeczywiste dane miesięczne ETF w walucie bazowej USD (bez wpływu kursu PLN)</option>
+            <option value="bootstrap">Empiryczny Block Bootstrap (Losowanie prawdziwych bloków rocznych z lat 2000–2026)</option>
+            <option value="deterministic">Teoretyczny gładki CAGR (Tylko dla odniesienia matematycznego)</option>
+          </select>
+        </div>
+
+        <details class="assumptions-box">
+          <summary>⚙️ Parametry obligacji EDO i stóp dla trybu teoretycznego</summary>
+          <div class="assumptions-grid">
+            <div>
+              <label class="form-label">EDO 1. rok (%)</label>
+              <input type="number" step="0.05" id="edoYear1RateInput" class="input-control" value="6.55" />
+            </div>
+            <div>
+              <label class="form-label">Marża EDO lata 2–10 (%)</label>
+              <input type="number" step="0.05" id="edoMarginInput" class="input-control" value="1.50" />
+            </div>
+            <div>
+              <label class="form-label">S&amp;P 500 CAGR (%)</label>
+              <input type="number" step="0.1" id="ret_sp500" class="input-control" value="10.5" />
+            </div>
+            <div>
+              <label class="form-label">Nasdaq-100 CAGR (%)</label>
+              <input type="number" step="0.1" id="ret_nasdaq100" class="input-control" value="13.4" />
+            </div>
+            <div>
+              <label class="form-label">MSCI World CAGR (%)</label>
+              <input type="number" step="0.1" id="ret_msci_world" class="input-control" value="9.4" />
+            </div>
+            <div>
+              <label class="form-label">MSCI Momentum (%)</label>
+              <input type="number" step="0.1" id="ret_msci_momentum" class="input-control" value="11.8" />
+            </div>
+            <div>
+              <label class="form-label">MSCI ACWI CAGR (%)</label>
+              <input type="number" step="0.1" id="ret_msci_acwi" class="input-control" value="8.9" />
+            </div>
+          </div>
+        </details>
+      </section>
+    </aside>
+
+    <!-- PRAWA KOLUMNA: WYNIKI, WYKRESY, ANALIZA OBSUNIĘĆ I PORÓWNANIE STRATEGII -->
+    <div class="main-dashboard">
+      <!-- Karty podsumowujące KPI -->
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">
+            Wartość Końcowa Netto
+            <span class="info-tip" data-tip-title="Wartość Końcowa Netto (Na rękę)" data-tip-body="Całkowita kwota, którą otrzymasz po zamknięciu portfela na koniec horyzontu inwestycyjnego – już po odjęciu należnego podatku Belki (19%) lub ryczałtu IKZE (10%)." data-tip-hint="Pod spodem widzisz również jej realną siłę nabywczą po uwzględnieniu inflacji.">?</span>
+          </div>
+          <div class="kpi-value text-blue" id="kpiNetValue">0 zł</div>
+          <div class="kpi-sub" id="kpiNetSub">Po odliczeniu podatku</div>
+        </div>
+
+        <div class="kpi-card purple">
+          <div class="kpi-label">
+            Suma Wpłaconego Kapitału
+            <span class="info-tip" data-tip-title="Suma Wpłaconego Kapitału" data-tip-body="Łączna kwota wszystkich Twoich przelewów z własnej kieszeni (kapitał początkowy + wszystkie miesięczne dopłaty w całym okresie)." data-tip-hint="Stanowi bazę kosztową – podatek Belki płacisz wyłącznie od nadwyżki ponad tę kwotę.">?</span>
+          </div>
+          <div class="kpi-value" id="kpiContributed">0 zł</div>
+          <div class="kpi-sub" id="kpiContributedSub">Z uwzględnieniem waloryzacji</div>
+        </div>
+
+        <div class="kpi-card emerald">
+          <div class="kpi-label">
+            Czysty Zysk Netto (Na rękę)
+            <span class="info-tip" data-tip-title="Czysty Zysk Netto, Mnożnik i CAGR" data-tip-body="• Zysk Netto = Wartość Końcowa Netto minus Suma Wpłat.<br>• Mnożnik (np. 2.50x) pokazuje, ile razy pomnożyłeś wpłacony kapitał.<br>• CAGR to średnioroczna geometryczna stopa zwrotu portfela (procent składany)." data-tip-hint="Im wyższy mnożnik przy akceptowalnym obsunięciu (MaxDD), tym efektywniej pracował kapitał.">?</span>
+          </div>
+          <div class="kpi-value text-emerald" id="kpiProfit">0 zł</div>
+          <div class="kpi-sub" id="kpiProfitSub">Mnożnik kapitału</div>
+        </div>
+
+        <div class="kpi-card rose">
+          <div class="kpi-label">
+            Podatek Belki / Tarcza IKE
+            <span class="info-tip" data-tip-title="Koszt Podatkowy vs Tarcza IKE" data-tip-body="Pokazuje łączną kwotę podatku od zysków kapitałowych (19%), którą zabiera fiskus przy zwykłym koncie maklerskim (wliczając podatek przy 10-letnim rolowaniu obligacji EDO)." data-tip-hint="Przełącz konto na IKE po lewej stronie, aby zobaczyć o ile więcej kapitału zostanie w Twojej kieszeni.">?</span>
+          </div>
+          <div class="kpi-value text-rose" id="kpiTax">0 zł</div>
+          <div class="kpi-sub" id="kpiTaxSub">Obciążenie podatkowe</div>
+        </div>
+      </div>
+
+      <!-- Pasek informacyjny o wpływie waloryzacji wpłat -->
+      <div class="card" style="padding:0.9rem 1.2rem;background:rgba(59, 130, 246, 0.08);border-color:rgba(59, 130, 246, 0.3);font-size:0.83rem;" id="inflationImpactBanner"></div>
+
+      <!-- Główny wykres interaktywny -->
+      <section class="card">
+        <div class="card-header" style="flex-wrap:wrap;gap:0.75rem;">
+          <div class="view-tabs">
+            <button type="button" class="view-tab active" data-charttab="wealth" data-tip-title="Wykres Wzrostu Portfela" data-tip-body="Porównuje wartość Twojego portfela Netto (po podatku), Brutto (przed podatkiem), wybrany Benchmark oraz sumę wpłaconych pieniędzy w każdym miesiącu." data-tip-hint="Najedź kursorem na wykres, aby sprawdzić dokładne kwoty w wybranym miesiącu.">📈 Wzrost Portfela (Rzeczywisty)</button>
+            <button type="button" class="view-tab" data-charttab="compare_strategies" data-tip-title="Porównanie 7 Strategii" data-tip-body="Zestawia Twój portfel z 6 popularnymi strategiami (100% Momentum, 100% S&P 500, 100% Nasdaq-100, 100% ACWI, 60/40 oraz 100% EDO) na dokładnie tych samych danych rynkowych." data-tip-hint="Pozwala szybko ocenić, czy Twoja mieszanka bije pojedyncze indeksy.">🏆 Porównanie 7 Strategii</button>
+            <button type="button" class="view-tab" data-charttab="drawdown" data-tip-title="Wykres Obsunięć Kapitału (Underwater Chart)" data-tip-body="Pokazuje o ile procent w danym miesiącu portfel znajdował się poniżej swojego wcześniejszego szczytu (0% oznacza nowy rekord wartości jednostki portfela)." data-tip-hint="Im płytsze i krótsze są 'dołki' pod kreską 0%, tym spokojniej śpisz podczas kryzysów.">📉 Obsunięcia Kapitału (Underwater)</button>
+            <button type="button" class="view-tab" data-charttab="yearly_bars" data-tip-title="Roczne Stopy Zwrotu (2000–2026)" data-tip-body="Zestawienie rzeczywistych wyników Twojego portfela w każdym pojedynczym roku kalendarzowym od 2000 do 2026 roku." data-tip-hint="Zielone słupki oznaczają lata zyskowne, a czerwone lata stratne.">📊 Stopy Roczne (2000–2026)</button>
+            <button type="button" class="view-tab" data-charttab="breakdown" data-tip-title="Struktura Aktywów w Czasie" data-tip-body="Wykres warstwowy pokazujący, jaką część portfela w każdym miesiącu stanowiły poszczególne ETF-y oraz obligacje skarbowe EDO." data-tip-hint="Widać tu jak obligacje EDO stabilizują wartość portfela, gdy warstwy akcyjne się kurczą.">🧱 Struktura Aktywów</button>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:0.5rem;">
+            <span style="font-size:0.76rem;color:var(--text-secondary);">Benchmark:</span>
+            <select id="benchmarkSelect" class="select-control" style="width:auto;padding:0.35rem 0.65rem;font-size:0.78rem;">
+              <option value="core_momentum_edo">Core + Momentum + EDO (40/30/30)</option>
+              <option value="classic_60_40">Klasyczny 60/40 (MSCI World + EDO)</option>
+              <option value="pure_momentum">100% MSCI World Momentum ETF</option>
+              <option value="pure_sp500">100% S&amp;P 500 ETF</option>
+              <option value="pure_nasdaq">100% Nasdaq-100 ETF</option>
+              <option value="pure_world">100% MSCI World ETF</option>
+              <option value="pure_acwi">100% MSCI ACWI ETF</option>
+              <option value="pure_edo">100% Obligacje Skarbowe EDO</option>
+              <option value="growth_80_20">Dynamiczny 80/20 (USA + Momentum + EDO)</option>
+              <option value="safe_edo_shield">Bezpieczna Tarcza 30/70 (ACWI + Momentum + EDO)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="chart-wrapper">
+          <canvas id="mainChartCanvas" class="chart-canvas"></canvas>
+          <div id="mainChartTooltip" class="chart-tooltip"></div>
+        </div>
+        <div id="mainChartLegend" class="chart-legend"></div>
+      </section>
+
+      <!-- SEKCJA: GŁĘBOKA ANALIZA OBSUNIĘĆ (DRAWDOWN), SZANSY NA SPADKI I OKIEN HISTORYCZNYCH (2000–2026) -->
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">
+              🛡️ Analiza Obsunięć (Drawdown), Prawdopodobieństwa Spadków i Statystyk Ryzyka (Dane Historyczne 2000–2026)
+              <span class="info-tip" data-tip-title="Jak działa analiza empiryczna 2000–2026?" data-tip-body="Symulator bierze wybrane przez Ciebie proporcje ETF-ów i EDO, a następnie testuje je na wszystkich 321 prawdziwych miesiącach od lutego 2000 do października 2026 r. Dzięki temu szansa na obsunięcie nie jest zgadywana z rozkładu normalnego, lecz wynika z prawdziwych krachów (2000, 2008, 2020, 2022)." data-tip-hint="Najedź na ikonki '?' przy poszczególnych wskaźnikach poniżej, aby poznać ich dokładne znaczenie.">?</span>
+            </h2>
+            <p class="card-subtitle">Obliczone na podstawie 321 prawdziwych miesięcy rynkowych (obejmujących Bańkę Dot-Com 2000–2002, Kryzys 2008, COVID 2020 i Bessę Inflacyjną 2022)</p>
+          </div>
+        </div>
+
+        <div class="dual-grid">
+          <!-- Lewa kolumna: Szansa na obsunięcie + Wskaźniki ryzyka -->
+          <div>
+            <h3 style="font-size:0.88rem;font-weight:700;margin-bottom:0.65rem;color:#f8fafc;">
+              🎲 Empiryczna szansa na obsunięcie kapitału (dla Twoich wag portfela)
+              <span class="info-tip" data-tip-title="Empiryczne Prawdopodobieństwo Obsunięcia (Drawdown Probability)" data-tip-body="Pokazuje w ilu procentach historycznych okresów ten portfel spadł od swojego szczytu o co najmniej 5%, 10%, 15%, 20%, 30% lub 40%.<br>• 'Rocznie' – szansa, że taki spadek przydarzy Ci się w ciągu pojedynczych 12 miesięcy.<br>• 'W N lat' – szansa, że doświadczysz takiego spadku chociaż raz w trakcie całego horyzontu inwestycji." data-tip-hint="Dodanie obligacji EDO (np. 30–40%) drastycznie zmniejsza szansę na bolesny krach ≥ 20% lub ≥ 30%.">?</span>
+            </h3>
+            <div id="drawdownProbabilitiesContainer" style="margin-bottom:1.1rem;"></div>
+
+            <h3 style="font-size:0.88rem;font-weight:700;margin-bottom:0.65rem;color:#f8fafc;">
+              📐 Zaawansowane statystyki ryzyka (Wybrany okres symulacji)
+              <span class="info-tip" data-tip-title="Zaawansowane Miary Ryzyka Portfela" data-tip-body="Zestaw wskaźników używanych przez profesjonalnych zarządzających funduszami do oceny relacji zysku do ponoszonego ryzyka. Najedź na '?' w każdej karcie, aby przeczytać szczegółowe wyjaśnienie." data-tip-hint="Szukaj portfela, który ma wysokie Sharpe/Sortino przy akceptowalnym dla Ciebie Max Drawdown.">?</span>
+            </h3>
+            <div id="advancedRiskMetricsGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:0.55rem;"></div>
+          </div>
+
+          <!-- Prawa kolumna: Kroczące okna historyczne + Największe historyczne krachy portfela -->
+          <div>
+            <h3 style="font-size:0.88rem;font-weight:700;margin-bottom:0.65rem;color:#f8fafc;">
+              <span id="rollingWindowsTitle">🔄 Test wszystkich historycznych momentów startu (Rolling Windows 2000–2026)</span>
+              <span class="info-tip" data-tip-title="Analiza Kroczących Okien Historycznych (Rolling Windows)" data-tip-body="Co gdybyś nie miał szczęścia i zaczął inwestować na samym szczycie bańki giełdowej? Ten test sprawdza wynik Twojego portfela przy starcie w KAŻDYM możliwym miesiącu między 2000 a 2026 rokiem (np. ponad 200 różnych dat rozpoczęcia)." data-tip-hint="Pokazuje najlepszy historyczny przypadek, medianę (typowy wynik) oraz absolutnie najgorszy moment startu w historii.">?</span>
+            </h3>
+            <div id="rollingWindowsSummaryBox" style="margin-bottom:1.1rem;"></div>
+
+            <h3 style="font-size:0.88rem;font-weight:700;margin-bottom:0.65rem;color:#f8fafc;">
+              📉 Największe historyczne obsunięcia tego portfela (2000–2026)
+              <span class="info-tip" data-tip-title="Tabela Największych Historycznych Krachów" data-tip-body="Wypisuje najpoważniejsze spadki wartości jednostki Twojego portfela w latach 2000–2026 wraz z dokładnymi datami rozpoczęcia spadku (Szczyt), najniższego punktu (Dołek) oraz miesiąca, w którym portfel odrobił straty i pobił nowy rekord." data-tip-hint="Pozwala zobaczyć, ile miesięcy w najgorszym kryzysie trzeba było czekać na wyjście na plus.">?</span>
+            </h3>
+            <div class="table-responsive">
+              <table class="comparison-table" style="font-size:0.78rem;">
+                <thead>
+                  <tr>
+                    <th>Szczyt → Dołek <span class="info-tip" data-tip-title="Szczyt → Dołek" data-tip-body="Miesiąc, w którym portfel osiągnął historyczny szczyt przed krachem, oraz miesiąc, w którym zanotował najgłębszy dołek podczas danej bessy.">?</span></th>
+                    <th>Wyjście na szczyt <span class="info-tip" data-tip-title="Data Odrobienia Strat (Recovery Date)" data-tip-body="Miesiąc, w którym wycena portfela po raz pierwszy przebiła poprzedni szczyt sprzed krachu.">?</span></th>
+                    <th>Max Spadek <span class="info-tip" data-tip-title="Maksymalna Głębokość Spadku" data-tip-body="O ile procent spadła wartość jednostki portfela od szczytu do samego dna krachu.">?</span></th>
+                    <th>Czas spadku <span class="info-tip" data-tip-title="Czas Trwania Spadku (Decline Duration)" data-tip-body="Liczba miesięcy od ostatniego szczytu do osiągnięcia najniższego punktu (dna bessy).">?</span></th>
+                    <th>Czas pod wodą <span class="info-tip" data-tip-title="Łączny Czas Pod Wodą (Time Underwater)" data-tip-body="Łączna liczba miesięcy od szczytu aż do całkowitego odrobienia strat (spadek + odbicie na nowy rekord).">?</span></th>
+                  </tr>
+                </thead>
+                <tbody id="historicalDrawdownsTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Dwa mniejsze wykresy: Podział Portfela (Donut) + Waloryzacja Wpłat Miesięcznych -->
+      <div class="dual-grid">
+        <section class="card">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">Docelowa Alokacja Portfela</h3>
+              <p class="card-subtitle">Proporcje między ETF-ami akcyjnymi a obligacjami skarbowymi EDO</p>
+            </div>
+          </div>
+          <div class="chart-wrapper-sm">
+            <canvas id="donutChartCanvas" class="chart-canvas"></canvas>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">Waloryzacja Miesięcznej Wpłaty o Inflację</h3>
+              <p class="card-subtitle">Nominalna kwota przelewu co miesiąc vs jej stała siła nabywcza</p>
+            </div>
+          </div>
+          <div class="chart-wrapper-sm">
+            <canvas id="contribChartCanvas" class="chart-canvas"></canvas>
+            <div id="contribChartTooltip" class="chart-tooltip"></div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Tabela porównawcza wszystkich strategii -->
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">Kompleksowe Porównanie Strategii na Prawdziwych Danych Miesięcznych</h2>
+            <p class="card-subtitle">Zestawienie Twojego portfela z gotowymi strategiami oraz pojedynczymi ETF-ami i obligacjami EDO (te same wpłaty, inflacja i podatki)</p>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="comparison-table">
+            <thead>
+              <tr>
+                <th>Strategia / Skład Portfela</th>
+                <th>Wartość Brutto <span class="info-tip" data-tip-title="Wartość Portfela Brutto" data-tip-body="Wartość wypracowanego kapitału przed potrąceniem podatku od zysków kapitałowych (podatku Belki 19% lub ryczałtu IKZE).">?</span></th>
+                <th>Podatek (Belka / IKZE) <span class="info-tip" data-tip-title="Zapłacony Podatek" data-tip-body="Łączna kwota podatku potrącona w trakcie inwestycji (np. przy rolowaniu 10-letnich obligacji EDO) oraz przy wypłacie końcowej.">?</span></th>
+                <th>Wartość Netto <span class="info-tip" data-tip-title="Wartość Portfela Netto" data-tip-body="Kwota końcowa na rękę po zapłaceniu wszystkich podatków.">?</span></th>
+                <th>Zysk Netto (Mnożnik) <span class="info-tip" data-tip-title="Zysk Netto i Mnożnik Kapitału" data-tip-body="Nadwyżka wypracowana ponad wpłacone pieniądze oraz krotność pomnożenia wpłaconego kapitału (np. 2.40x oznacza, że każda wpłacona złotówka zamieniła się w 2,40 zł netto).">?</span></th>
+                <th>CAGR (TWR) <span class="info-tip" data-tip-title="CAGR (Compound Annual Growth Rate – TWR)" data-tip-body="Średnioroczna geometryczna stopa zwrotu jednostki portfela (Time-Weighted Return), niezależna od wielkości dopłat." data-tip-hint="Pozwala obiektywnie porównać tempo wzrostu samego portfela.">?</span></th>
+                <th>Zmienność / Sharpe <span class="info-tip" data-tip-title="Zmienność Roczna (Volatility) i Wskaźnik Sharpe'a" data-tip-body="• Zmienność (%): jak mocno wartość portfela waha się z roku na rok (odchylenie standardowe). Niższa = spokojniejsza jazda.<br>• Sharpe Ratio (Sh): ile jednostek zysku ponad stopę wolną od ryzyka przypada na jednostkę zmienności." data-tip-hint="Sharpe > 0.5 jest dobry, > 0.8 bardzo dobry, a > 1.0 wybitny.">?</span></th>
+                <th>Max Drawdown (Szczyt→Dołek) <span class="info-tip" data-tip-title="Max Drawdown (Maksymalne Obsunięcie)" data-tip-body="Największy procentowy spadek wartości jednostki portfela od szczytu do dołka w badanym okresie, wraz z dokładnymi datami kiedy ten spadek wystąpił." data-tip-hint="Pokazuje najgorszy moment kryzysu, jaki musiałbyś wytrzymać psychicznie.">?</span></th>
+              </tr>
+            </thead>
+            <tbody id="comparisonTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Globalny dymek edukacyjny dla ikonek (?) -->
+  <div id="globalHelpTooltip" class="global-help-tooltip"></div>
+
+  <script src="./bundle.js"></script>
+</body>
+</html>
