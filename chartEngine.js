@@ -542,6 +542,261 @@ export function renderDonutChart(canvas, slices, centerTitle, centerSub) {
   ctx.fillText(centerSub, cx, cy + 12);
 }
 
+/**
+ * Rysuje interaktywny Histogram rozkładu zwrotów dla wszystkich N-letnich okresów historycznych
+ * z możliwością bezpośredniego nałożenia bezpiecznego portfela 100% Obligacji EDO
+ */
+export function renderHistogramChart(canvas, tooltipEl, config) {
+  const {
+    bins = [],
+    totalWindows = 1,
+    minVal = 0,
+    maxVal = 100,
+    targetValue = 0,
+    medianVal = 0,
+    edoMedianVal = null,
+    showEdoComparison = true,
+    valueFormatter = (v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`
+  } = config;
+
+  const state = { hoverIndex: null };
+
+  function draw() {
+    const { ctx, width, height } = setupHiDPICanvas(canvas);
+    ctx.clearRect(0, 0, width, height);
+
+    if (!bins.length) return;
+
+    const padLeft = 58;
+    const padRight = 24;
+    const padTop = 30;
+    const padBottom = 42;
+    const plotW = Math.max(50, width - padLeft - padRight);
+    const plotH = Math.max(50, height - padTop - padBottom);
+
+    const maxBinPct = Math.max(
+      5,
+      ...bins.map((b) => Math.max(b.pct || 0, showEdoComparison ? (b.edoPct || 0) : 0))
+    );
+    const maxPct = maxBinPct * 1.16;
+    const toY = (pct) => padTop + plotH - (pct / maxPct) * plotH;
+    const span = maxVal - minVal || 1;
+    const toValX = (val) => padLeft + Math.max(0, Math.min(1, (val - minVal) / span)) * plotW;
+
+    // Siatka pozioma (% okresów)
+    ctx.font = '11px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    for (let i = 0; i <= 4; i++) {
+      const pctVal = (maxPct * i) / 4;
+      const y = toY(pctVal);
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.12)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(padLeft, y);
+      ctx.lineTo(width - padRight, y);
+      ctx.stroke();
+
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillText(`${pctVal.toFixed(0)}%`, padLeft - 8, y);
+    }
+
+    const n = bins.length;
+    const slotW = plotW / n;
+    const barW = Math.max(6, slotW - 4);
+
+    bins.forEach((b, i) => {
+      const x = padLeft + i * slotW + 2;
+      const isHovered = state.hoverIndex === i;
+
+      if (showEdoComparison) {
+        const subW = Math.max(3, (barW - 2) / 2);
+
+        // 1. Słupek Twojego Portfela (lewa połowa koszyka)
+        const yUser = toY(b.pct);
+        const hUser = Math.max(b.count > 0 ? 2 : 0, padTop + plotH - yUser);
+        let fillUser;
+        if (b.center < 0) {
+          fillUser = isHovered ? '#fb7185' : 'rgba(244, 63, 94, 0.82)';
+        } else if (b.center >= targetValue) {
+          fillUser = isHovered ? '#34d399' : 'rgba(16, 185, 129, 0.85)';
+        } else {
+          fillUser = isHovered ? '#60a5fa' : 'rgba(59, 130, 246, 0.78)';
+        }
+
+        if (hUser > 0) {
+          ctx.fillStyle = fillUser;
+          ctx.fillRect(x, yUser, subW, hUser);
+          ctx.strokeStyle = b.center < 0 ? '#f43f5e' : b.center >= targetValue ? '#10b981' : '#3b82f6';
+          ctx.lineWidth = isHovered ? 1.8 : 1;
+          ctx.strokeRect(x, yUser, subW, hUser);
+        }
+
+        // 2. Słupek Bezpiecznego Portfela 100% EDO (prawa połowa koszyka - kolor cyjan/turkus)
+        const yEdo = toY(b.edoPct || 0);
+        const hEdo = Math.max((b.edoCount || 0) > 0 ? 2 : 0, padTop + plotH - yEdo);
+        if (hEdo > 0) {
+          ctx.fillStyle = isHovered ? '#22d3ee' : 'rgba(6, 182, 212, 0.62)';
+          ctx.fillRect(x + subW + 2, yEdo, subW, hEdo);
+          ctx.strokeStyle = '#06b6d4';
+          ctx.lineWidth = isHovered ? 1.8 : 1;
+          ctx.strokeRect(x + subW + 2, yEdo, subW, hEdo);
+        }
+
+        // Etykieta % nad słupkiem Twojego Portfela
+        if (b.count > 0) {
+          ctx.fillStyle = '#e2e8f0';
+          ctx.font = '9.5px Inter, system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(`${b.pct.toFixed(0)}%`, x + subW / 2, yUser - 2);
+        }
+      } else {
+        const y = toY(b.pct);
+        const barH = Math.max(2, padTop + plotH - y);
+
+        let fillColor;
+        if (b.center < 0) {
+          fillColor = isHovered ? '#fb7185' : 'rgba(244, 63, 94, 0.78)';
+        } else if (b.center >= targetValue) {
+          fillColor = isHovered ? '#34d399' : 'rgba(16, 185, 129, 0.82)';
+        } else {
+          fillColor = isHovered ? '#60a5fa' : 'rgba(59, 130, 246, 0.72)';
+        }
+
+        ctx.fillStyle = fillColor;
+        ctx.fillRect(x, y, barW, barH);
+
+        ctx.strokeStyle = b.center < 0 ? '#f43f5e' : b.center >= targetValue ? '#10b981' : '#3b82f6';
+        ctx.lineWidth = isHovered ? 2 : 1;
+        ctx.strokeRect(x, y, barW, barH);
+
+        if (b.count > 0) {
+          ctx.fillStyle = '#cbd5e1';
+          ctx.font = '10px Inter, system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(`${b.pct.toFixed(0)}%`, x + barW / 2, y - 3);
+        }
+      }
+
+      // Etykiety osi X co 2 koszyki
+      if (i % 2 === 0 || i === n - 1) {
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '10.5px Inter, system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillText(valueFormatter(b.center), x + barW / 2, padTop + plotH + 10);
+      }
+    });
+
+    // Pionowa linia: Mediana bezpiecznego portfela 100% EDO
+    if (showEdoComparison && edoMedianVal !== null && edoMedianVal >= minVal && edoMedianVal <= maxVal) {
+      const ex = toValX(edoMedianVal);
+      ctx.save();
+      ctx.strokeStyle = '#22d3ee';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      ctx.moveTo(ex, padTop + 12);
+      ctx.lineTo(ex, padTop + plotH);
+      ctx.stroke();
+
+      ctx.fillStyle = '#22d3ee';
+      ctx.font = 'bold 10px Inter, system-ui, sans-serif';
+      ctx.textAlign = ex < padLeft + 90 ? 'left' : 'right';
+      ctx.textBaseline = 'top';
+      ctx.fillText(`Mediana EDO: ${valueFormatter(edoMedianVal)}`, ex + (ex < padLeft + 90 ? 4 : -4), padTop + 2);
+      ctx.restore();
+    }
+
+    // Pionowa linia: Próg docelowy użytkownika (targetValue)
+    if (targetValue >= minVal && targetValue <= maxVal) {
+      const tx = toValX(targetValue);
+      ctx.save();
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath();
+      ctx.moveTo(tx, padTop - 4);
+      ctx.lineTo(tx, padTop + plotH);
+      ctx.stroke();
+
+      ctx.fillStyle = '#fbbf24';
+      ctx.font = 'bold 11px Inter, system-ui, sans-serif';
+      ctx.textAlign = tx > width - 120 ? 'right' : 'left';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(`Twój próg: ${valueFormatter(targetValue)}`, tx + (tx > width - 120 ? -4 : 4), padTop - 5);
+      ctx.restore();
+    }
+
+    // Pionowa linia: Mediana Twojego Portfela (50. percentyl)
+    if (medianVal >= minVal && medianVal <= maxVal) {
+      const mx = toValX(medianVal);
+      ctx.save();
+      ctx.strokeStyle = '#c084fc';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(mx, padTop + 10);
+      ctx.lineTo(mx, padTop + plotH);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  canvas.onmousemove = (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const padLeft = 58;
+    const padRight = 24;
+    const plotW = Math.max(50, rect.width - padLeft - padRight);
+    const relX = (mx - padLeft) / plotW;
+
+    if (relX < 0 || relX > 1 || !bins.length) {
+      state.hoverIndex = null;
+      if (tooltipEl) tooltipEl.style.display = 'none';
+      draw();
+      return;
+    }
+
+    const idx = Math.min(bins.length - 1, Math.max(0, Math.floor(relX * bins.length)));
+    state.hoverIndex = idx;
+    draw();
+
+    if (tooltipEl) {
+      const b = bins[idx];
+      tooltipEl.style.display = 'block';
+      tooltipEl.innerHTML = `
+        <div class="tooltip-title">Przedział: ${valueFormatter(b.min)} do ${valueFormatter(b.max)}</div>
+        <div class="tooltip-row">
+          <span class="tooltip-label"><span class="tooltip-dot" style="background:#3b82f6"></span>Twój Portfel:</span>
+          <strong>${b.count} z ${totalWindows} (${b.pct.toFixed(1)}%)</strong>
+        </div>
+        ${showEdoComparison ? `
+        <div class="tooltip-row">
+          <span class="tooltip-label"><span class="tooltip-dot" style="background:#22d3ee"></span>100% Obligacje EDO:</span>
+          <strong style="color:#22d3ee">${b.edoCount || 0} z ${totalWindows} (${(b.edoPct || 0).toFixed(1)}%)</strong>
+        </div>` : ''}
+        ${b.samples.length ? `<div style="margin-top:4px;font-size:0.7rem;color:#94a3b8;">Twój Portfel (przykłady): ${b.samples.join(', ')}</div>` : ''}
+        ${showEdoComparison && b.edoSamples?.length ? `<div style="margin-top:2px;font-size:0.7rem;color:#67e8f9;">100% EDO (przykłady): ${b.edoSamples.join(', ')}</div>` : ''}
+      `;
+      const tipWidth = 275;
+      const leftPos = (mx + tipWidth + 25 > rect.width) ? Math.max(10, mx - tipWidth - 15) : mx + 15;
+      tooltipEl.style.left = `${leftPos}px`;
+      tooltipEl.style.top = `16px`;
+    }
+  };
+
+  canvas.onmouseleave = () => {
+    state.hoverIndex = null;
+    if (tooltipEl) tooltipEl.style.display = 'none';
+    draw();
+  };
+
+  draw();
+}
+
 function hexToRgba(hex, alpha) {
   const clean = hex.replace('#', '');
   const r = parseInt(clean.substring(0, 2), 16);

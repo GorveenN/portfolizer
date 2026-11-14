@@ -4,13 +4,15 @@ import {
   PRESET_STRATEGIES,
   generateMarketEnvironment,
   simulatePortfolio,
-  analyzeHistoricalRiskAndDrawdowns
+  analyzeHistoricalRiskAndDrawdowns,
+  runRollingNYearAnalysis
 } from './financeEngine.js';
 import {
   renderLineChart,
   renderBarChart,
   renderStackedAreaChart,
   renderDonutChart,
+  renderHistogramChart,
   formatPLN
 } from './chartEngine.js';
 
@@ -45,6 +47,12 @@ const state = {
   valueDisplayMode: 'nominal',
   activeMainChartTab: 'wealth',
   compareBenchmarkId: 'core_momentum_edo',
+  // Nowe parametry analizy wszystkich N-letnich okresów i histogramu szans
+  nYearsRolling: 10,
+  histRangeStart: 1985,
+  histRangeEnd: 2026,
+  nYearMetric: 'totalReturnPct', // 'totalReturnPct' | 'cagr' | 'profitPLN'
+  targetReturn: 50,
   customReturns: {
     sp500: ASSETS.sp500.defaultReturn,
     nasdaq100: ASSETS.nasdaq100.defaultReturn,
@@ -67,6 +75,7 @@ function initApp() {
   window.addEventListener('resize', () => {
     if (lastSimulationResult) {
       updateCharts();
+      updateNYearRollingSection();
     }
   });
 }
@@ -522,6 +531,74 @@ function bindControls() {
   if (exportBtn) {
     exportBtn.addEventListener('click', exportSimulationToCSV);
   }
+
+  // Kontrolki sekcji N-letnich okresów i histogramu szans
+  bindNumberAndRange('nYearsRollingInput', 'nYearsRollingRange', 'nYearsRollingVal', 'nYearsRolling', (v) => `${v} ${v === 1 ? 'rok' : (v >= 2 && v <= 4 ? 'lata' : 'lat')}`);
+
+  const histStartEl = document.getElementById('histRangeStartInput');
+  const histEndEl = document.getElementById('histRangeEndInput');
+  const histLabelEl = document.getElementById('histRangeLabel');
+
+  const onHistRangeChange = (changed) => {
+    let sY = Math.max(1985, Math.min(2024, Number(histStartEl?.value) || 1985));
+    let eY = Math.max(1987, Math.min(2026, Number(histEndEl?.value) || 2026));
+    if (eY - sY < 2) {
+      if (changed === 'start') {
+        eY = Math.min(2026, sY + 2);
+        sY = Math.min(sY, eY - 2);
+      } else {
+        sY = Math.max(1985, eY - 2);
+        eY = Math.max(eY, sY + 2);
+      }
+    }
+    state.histRangeStart = sY;
+    state.histRangeEnd = eY;
+    if (histStartEl && document.activeElement !== histStartEl) histStartEl.value = sY;
+    if (histEndEl && document.activeElement !== histEndEl) histEndEl.value = eY;
+    if (histLabelEl) histLabelEl.textContent = `${sY} – ${eY}`;
+    runFullSimulation();
+  };
+
+  if (histStartEl) histStartEl.addEventListener('input', () => onHistRangeChange('start'));
+  if (histEndEl) histEndEl.addEventListener('input', () => onHistRangeChange('end'));
+
+  const metricSel = document.getElementById('nYearMetricSelect');
+  const targetNumEl = document.getElementById('targetReturnInput');
+  const targetRgEl = document.getElementById('targetReturnRange');
+  const targetValLabel = document.getElementById('targetReturnVal');
+
+  const formatTargetLabel = (val) => {
+    if (state.nYearMetric === 'profitPLN') {
+      return `${val >= 0 ? '+' : ''}${formatPLN(val)}`;
+    }
+    return `${val >= 0 ? '+' : ''}${val}%${state.nYearMetric === 'cagr' ? ' / rok' : ''}`;
+  };
+
+  if (metricSel) {
+    metricSel.value = state.nYearMetric;
+    metricSel.addEventListener('change', (e) => {
+      state.nYearMetric = e.target.value;
+      if (state.nYearMetric === 'totalReturnPct') {
+        state.targetReturn = 50;
+        if (targetRgEl) { targetRgEl.min = '-50'; targetRgEl.max = '300'; targetRgEl.step = '5'; }
+        if (targetNumEl) { targetNumEl.step = '5'; }
+      } else if (state.nYearMetric === 'cagr') {
+        state.targetReturn = 8;
+        if (targetRgEl) { targetRgEl.min = '-15'; targetRgEl.max = '25'; targetRgEl.step = '0.5'; }
+        if (targetNumEl) { targetNumEl.step = '0.5'; }
+      } else if (state.nYearMetric === 'profitPLN') {
+        state.targetReturn = 100000;
+        if (targetRgEl) { targetRgEl.min = '-100000'; targetRgEl.max = '1000000'; targetRgEl.step = '10000'; }
+        if (targetNumEl) { targetNumEl.step = '10000'; }
+      }
+      if (targetNumEl) targetNumEl.value = state.targetReturn;
+      if (targetRgEl) targetRgEl.value = state.targetReturn;
+      if (targetValLabel) targetValLabel.textContent = formatTargetLabel(state.targetReturn);
+      runFullSimulation();
+    });
+  }
+
+  bindNumberAndRange('targetReturnInput', 'targetReturnRange', 'targetReturnVal', 'targetReturn', formatTargetLabel);
 }
 
 function bindNumberAndRange(numId, rangeId, labelId, stateKey, formatterOrCallback) {
@@ -638,6 +715,27 @@ function runFullSimulation() {
     state.marketMode === 'historical_usd'
   );
 
+  // Pełna analiza wszystkich N-letnich okresów w wybranym przez użytkownika przedziale dat
+  const nYearAnalysis = runRollingNYearAnalysis({
+    weights: state.weights,
+    nYears: state.nYearsRolling,
+    rangeStartYear: state.histRangeStart,
+    rangeEndYear: state.histRangeEnd,
+    initialCapital: state.initialCapital,
+    monthlyContribution: state.monthlyContribution,
+    indexContributions: state.indexContributions,
+    indexationMode: state.indexationMode,
+    taxAccount: state.taxAccount,
+    ikzeTaxBracket: state.ikzeTaxBracket,
+    rebalanceMode: state.rebalanceMode,
+    edoYear1Rate: state.edoYear1Rate,
+    edoMargin: state.edoMargin,
+    useUsd: state.marketMode === 'historical_usd',
+    isReal: state.valueDisplayMode === 'real',
+    metric: state.nYearMetric,
+    targetValue: state.targetReturn
+  });
+
   lastSimulationResult = {
     userSim,
     standardTaxSim,
@@ -645,11 +743,13 @@ function runFullSimulation() {
     nonIndexedSim,
     allStrategyResults,
     singleAssetStrategies,
-    empiricalRisk
+    empiricalRisk,
+    nYearAnalysis
   };
 
   updateKPIs();
   updateCharts();
+  updateNYearRollingSection();
   updateRiskAndDrawdownSection();
   updateComparisonTable();
   updateInflationSummaryBox();
@@ -726,6 +826,202 @@ function updateInflationSummaryBox() {
         <strong class="text-amber">${formatPLN(sIdx.initialMonthlyContribution / sIdx.finalInflationFactor)}</strong> w pieniądzach z ${sIdx.startYM}.
       </div>
     `;
+  }
+}
+
+function updateNYearRollingSection() {
+  if (!lastSimulationResult || !lastSimulationResult.nYearAnalysis) return;
+  const ny = lastSimulationResult.nYearAnalysis;
+  const isReal = state.valueDisplayMode === 'real';
+
+  const fmtVal = (val) => {
+    if (ny.metric === 'profitPLN') {
+      return `${val >= 0 ? '+' : ''}${formatPLN(val)}`;
+    }
+    if (ny.metric === 'cagr') {
+      return `${val >= 0 ? '+' : ''}${val.toFixed(1)}%/r`;
+    }
+    return `${val >= 0 ? '+' : ''}${val.toFixed(1)}%`;
+  };
+
+  const getWindowMetric = (w) => {
+    if (!w) return 0;
+    if (ny.metric === 'profitPLN') return w.profitPLN;
+    if (ny.metric === 'cagr') return w.cagr;
+    return w.totalReturnPct;
+  };
+
+  const getEdoWindowMetric = (w) => {
+    if (!w) return 0;
+    if (ny.metric === 'profitPLN') return w.edoProfitPLN;
+    if (ny.metric === 'cagr') return w.edoCagr;
+    return w.edoTotalReturnPct;
+  };
+
+  // Nagłówek i licznik okresów
+  const subEl = document.getElementById('nYearAnalysisSubtitle');
+  const badgeEl = document.getElementById('nYearPeriodsCountBadge');
+  const tableYearsSpan = document.getElementById('tableNYearsSpan');
+
+  if (subEl) {
+    const clampNotice = ny.wasClamped
+      ? ` (skrócono z ${ny.requestedNYears} do maks. możliwych ${ny.effectiveNYears} lat w tym przedziale)`
+      : '';
+    subEl.textContent = `Symulacja Twojego portfela vs bezpieczny portfel 100% Obligacji EDO (${isReal ? 'Realnie po inflacji' : 'Nominalnie'}, konto ${state.taxAccount.toUpperCase()}) dla każdego możliwego ${ny.effectiveNYears}-letniego okresu w latach ${ny.firstAvailableYM} → ${ny.lastAvailableYM}${clampNotice}`;
+  }
+
+  if (badgeEl) {
+    badgeEl.textContent = `Przebadano: ${ny.totalWindows} okresów ${ny.effectiveNYears}-letnich (${ny.rangeStartYear}–${ny.rangeEndYear})`;
+  }
+
+  if (tableYearsSpan) {
+    tableYearsSpan.textContent = ny.effectiveNYears;
+  }
+
+  // Renderowanie histogramu (Twój Portfel vs 100% Obligacje EDO)
+  const histCanvas = document.getElementById('nYearHistogramCanvas');
+  const histTooltip = document.getElementById('nYearHistogramTooltip');
+  const medianVal = getWindowMetric(ny.medianWindow);
+  const edoMedianVal = getEdoWindowMetric(ny.edoMedianWindow);
+
+  if (histCanvas) {
+    renderHistogramChart(histCanvas, histTooltip, {
+      bins: ny.bins,
+      totalWindows: ny.totalWindows,
+      minVal: ny.minVal,
+      maxVal: ny.maxVal,
+      targetValue: ny.targetValue,
+      medianVal,
+      edoMedianVal,
+      showEdoComparison: true,
+      valueFormatter: fmtVal
+    });
+  }
+
+  // Renderowanie 4 kafelków percentylowych pod histogramem (Twój Portfel vs 100% EDO)
+  const pctBox = document.getElementById('nYearPercentilesBox');
+  if (pctBox && ny.worstWindow && ny.bestWindow) {
+    const pCards = [
+      {
+        title: 'NAJGORSZY OKRES (MIN)',
+        val: fmtVal(getWindowMetric(ny.worstWindow)),
+        dates: `${ny.worstWindow.startYM} → ${ny.worstWindow.endYM}`,
+        sub: `100% EDO min: <strong style="color:#22d3ee">${fmtVal(getEdoWindowMetric(ny.edoWorstWindow))}</strong>`,
+        color: '#fb7185',
+        bg: 'rgba(244,63,94,0.08)',
+        border: 'rgba(244,63,94,0.25)'
+      },
+      {
+        title: '10. PERCENTYL (PESYMIST.)',
+        val: fmtVal(getWindowMetric(ny.p10Window)),
+        dates: `${ny.p10Window.startYM} → ${ny.p10Window.endYM}`,
+        sub: `100% EDO (10%): <strong style="color:#22d3ee">${fmtVal(getEdoWindowMetric(ny.edoP10Window))}</strong>`,
+        color: '#fbbf24',
+        bg: 'rgba(245,158,11,0.08)',
+        border: 'rgba(245,158,11,0.25)'
+      },
+      {
+        title: 'MEDIANA (TYPOWY 50%)',
+        val: fmtVal(medianVal),
+        dates: `${ny.medianWindow.startYM} → ${ny.medianWindow.endYM}`,
+        sub: `100% EDO mediana: <strong style="color:#22d3ee">${fmtVal(edoMedianVal)}</strong>`,
+        color: '#c084fc',
+        bg: 'rgba(192,132,252,0.08)',
+        border: 'rgba(192,132,252,0.25)'
+      },
+      {
+        title: 'NAJLEPSZY OKRES (MAX)',
+        val: fmtVal(getWindowMetric(ny.bestWindow)),
+        dates: `${ny.bestWindow.startYM} → ${ny.bestWindow.endYM}`,
+        sub: `100% EDO max: <strong style="color:#22d3ee">${fmtVal(getEdoWindowMetric(ny.edoBestWindow))}</strong>`,
+        color: '#34d399',
+        bg: 'rgba(16,185,129,0.08)',
+        border: 'rgba(16,185,129,0.25)'
+      }
+    ];
+
+    pctBox.innerHTML = pCards.map((c) => `
+      <div style="background:${c.bg};border:1px solid ${c.border};border-radius:8px;padding:0.55rem 0.65rem;">
+        <div style="font-size:0.65rem;font-weight:700;color:${c.color};">${c.title}</div>
+        <div style="font-size:0.95rem;font-weight:800;margin:2px 0;color:#f8fafc;">${c.val}</div>
+        <div style="font-size:0.68rem;color:var(--text-secondary);">${c.dates}</div>
+        <div style="font-size:0.67rem;color:var(--text-muted);margin-top:2px;">${c.sub}</div>
+      </div>
+    `).join('');
+  }
+
+  // Renderowanie głównego boksu odpowiedzi dla zadanego progu użytkownika + Porównanie z 100% EDO
+  const targetBox = document.getElementById('customTargetProbabilityBox');
+  if (targetBox) {
+    const medianDiffPLN = (ny.medianWindow?.finalNet || 0) - (ny.edoMedianWindow?.edoFinalNet || 0);
+
+    targetBox.innerHTML = `
+      <div style="background:linear-gradient(135deg, rgba(30,41,59,0.9), rgba(15,23,42,0.95));border:1px solid rgba(59,130,246,0.35);border-radius:10px;padding:0.9rem;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:0.75rem;">
+          <div style="background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:8px;padding:0.65rem;">
+            <div style="font-size:0.72rem;color:#34d399;font-weight:700;text-transform:uppercase;">
+              Szansa na wynik ≥ ${fmtVal(ny.targetValue)}
+            </div>
+            <div style="font-size:1.5rem;font-weight:800;color:#10b981;margin:0.12rem 0;">
+              ${ny.probAboveOrEqual.toFixed(1)}% <span style="font-size:0.76rem;font-weight:600;color:var(--text-secondary);">(${ny.hitsAboveOrEqual}/${ny.totalWindows})</span>
+            </div>
+            <div style="font-size:0.72rem;color:#67e8f9;">
+              Bezpieczne 100% EDO: <strong>${ny.edoProbAboveOrEqual.toFixed(1)}%</strong> (${ny.edoHitsAboveOrEqual}/${ny.totalWindows})
+            </div>
+          </div>
+
+          <div style="background:rgba(6,182,212,0.1);border:1px solid rgba(6,182,212,0.32);border-radius:8px;padding:0.65rem;">
+            <div style="font-size:0.72rem;color:#22d3ee;font-weight:700;text-transform:uppercase;">
+              Twój Portfel wygrywa z 100% EDO
+            </div>
+            <div style="font-size:1.5rem;font-weight:800;color:#22d3ee;margin:0.12rem 0;">
+              ${ny.probBeatEdo.toFixed(1)}% <span style="font-size:0.76rem;font-weight:600;color:var(--text-secondary);">(${ny.beatEdoCount}/${ny.totalWindows})</span>
+            </div>
+            <div style="font-size:0.72rem;color:var(--text-secondary);">
+              Typowa przewaga (mediana): <strong class="${medianDiffPLN >= 0 ? 'text-emerald' : 'text-rose'}">${medianDiffPLN >= 0 ? '+' : ''}${formatPLN(medianDiffPLN)}</strong>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.76rem;padding-top:0.55rem;border-top:1px solid rgba(255,255,255,0.08);flex-wrap:wrap;gap:0.4rem;">
+          <span>Ryzyko straty kapitału (&lt; 0 zł) po ${ny.effectiveNYears} latach:</span>
+          <span>
+            Twój Portfel: <strong class="${ny.probAnyLoss === 0 ? 'text-emerald' : 'text-rose'}">${ny.probAnyLoss.toFixed(1)}%</strong>
+            &nbsp;|&nbsp;
+            100% Obligacje EDO: <strong class="text-emerald">0.0% (Gwarancja Skarbu Państwa)</strong>
+          </span>
+        </div>
+      </div>
+    `;
+  }
+
+  // Renderowanie tabeli szybkich progów (Twój Portfel vs 100% Obligacje EDO)
+  const quickContainer = document.getElementById('quickThresholdsContainer');
+  if (quickContainer) {
+    quickContainer.innerHTML = ny.quickThresholds.map((qt) => {
+      const isLoss = qt.type === 'loss';
+      const barColor = isLoss ? '#f43f5e' : '#10b981';
+      const textColor = isLoss
+        ? (qt.prob === 0 ? 'var(--text-emerald)' : '#fb7185')
+        : (qt.prob >= 75 ? '#34d399' : '#60a5fa');
+
+      return `
+        <div style="margin-bottom:0.42rem;background:var(--bg-input);padding:0.4rem 0.65rem;border-radius:7px;border:1px solid var(--border-color);">
+          <div style="display:flex;justify-content:space-between;font-size:0.75rem;margin-bottom:0.2rem;flex-wrap:wrap;gap:0.3rem;">
+            <span>${qt.label}</span>
+            <span>
+              Twój: <strong style="color:${textColor}">${qt.prob.toFixed(1)}%</strong> <span style="color:var(--text-muted);font-size:0.69rem;">(${qt.count}/${ny.totalWindows})</span>
+              &nbsp;|&nbsp;
+              <span style="color:#67e8f9;">100% EDO: <strong>${qt.edoProb.toFixed(1)}%</strong> <span style="font-size:0.69rem;opacity:0.8;">(${qt.edoCount}/${ny.totalWindows})</span></span>
+            </span>
+          </div>
+          <div style="height:6px;background:#1e293b;border-radius:3px;overflow:hidden;position:relative;">
+            <div style="width:${Math.min(100, qt.prob)}%;background:${barColor};height:3px;"></div>
+            <div style="width:${Math.min(100, qt.edoProb)}%;background:#22d3ee;height:3px;"></div>
+          </div>
+        </div>
+      `;
+    }).join('');
   }
 }
 

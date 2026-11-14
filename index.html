@@ -345,6 +345,118 @@
         <div id="mainChartLegend" class="chart-legend"></div>
       </section>
 
+      <!-- NOWA SEKCJA: ANALIZA WSZYSTKICH N-LETNICH OKRESÓW W WYBRANYM ZAKRESIE DAT + HISTOGRAM + KALKULATOR SZANSY NA ZADANY ZYSK/STRATĘ -->
+      <section class="card" style="border-color:rgba(59, 130, 246, 0.4);">
+        <div class="card-header" style="flex-wrap:wrap;gap:0.75rem;">
+          <div>
+            <h2 class="card-title">
+              🎯 Statystyczna Szansa na Zadany Zysk/Stratę i Histogram dla Wszystkich N-letnich Okresów
+              <span class="info-tip" data-tip-title="Jak działa analiza wszystkich N-letnich okresów?" data-tip-body="Wybierasz długość swojej inwestycji (N lat) oraz zakres lat historycznych (np. 1985–2026 lub 2000–2026). Symulator uruchamia pełną symulację Twojego portfela (z wpłatami miesięcznymi, waloryzacją i podatkami!) dla KAŻDEGO możliwego miesiąca początkowego w tym przedziale i buduje z nich histogram rozkładu wyników oraz oblicza dokładne prawdopodobieństwo osiągnięcia Twojego celu." data-tip-hint="Zmień N lat, zakres dat lub suwak zadanego zysku/straty, a histogram i szanse przeliczą się na żywo!">?</span>
+            </h2>
+            <p class="card-subtitle" id="nYearAnalysisSubtitle">Badanie wszystkich pełnych N-letnich okresów miesięcznych w wybranym zakresie czasu</p>
+          </div>
+          <span class="badge badge-info" id="nYearPeriodsCountBadge">Przebadano: 0 okresów</span>
+        </div>
+
+        <!-- Pasek kontrolny N lat, zakresu dat historycznych i zadanego progu zysku/straty -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(210px, 1fr));gap:0.9rem;background:var(--bg-input);padding:0.95rem;border-radius:var(--radius-md);border:1px solid var(--border-color);margin-bottom:1.2rem;">
+          <!-- 1. Długość inwestycji N lat -->
+          <div>
+            <div class="form-label">
+              <span>Długość inwestycji (<strong>N lat</strong>) <span class="info-tip" data-tip-title="Czas trwania każdego badanego okresu (N lat)" data-tip-body="Określa na ile lat inwestujesz pieniądze. Aplikacja wytnie z historii wszystkie możliwe okna o długości dokładnie N lat (12 × N miesięcy), zaczynające się w każdym kolejnym miesiącu." data-tip-hint="Sprawdź jak rośnie szansa na zysk i znika ryzyko straty, gdy zwiększasz N z 3 lat do 10 lub 15 lat!">?</span></span>
+              <span class="form-value text-blue" id="nYearsRollingVal">10 lat</span>
+            </div>
+            <div class="input-row" style="align-items:center;">
+              <input type="number" id="nYearsRollingInput" class="input-control" value="10" min="1" max="30" step="1" />
+              <input type="range" id="nYearsRollingRange" min="1" max="25" step="1" value="10" />
+            </div>
+          </div>
+
+          <!-- 2. Zakres czasu dla danych historycznych (Od roku - Do roku) -->
+          <div>
+            <div class="form-label">
+              <span>Zakres danych historycznych <span class="info-tip" data-tip-title="Wybór Zakresu Danych Historycznych" data-tip-body="Możesz zawęzić lub rozszerzyć przedział lat, z którego pobierane są historyczne miesiące do analizy (np. pełna historia 1985–2026, tylko XXI wiek 2000–2026, albo ostatnie 15 lat 2010–2026)." data-tip-hint="Pozwala sprawdzić jak statystyki zmieniają się w różnych epokach rynkowych.">?</span></span>
+              <span class="form-value" id="histRangeLabel">1985 – 2026</span>
+            </div>
+            <div class="input-row">
+              <div style="display:flex;align-items:center;gap:0.35rem;">
+                <span style="font-size:0.74rem;color:var(--text-secondary);">Od:</span>
+                <input type="number" id="histRangeStartInput" class="input-control" value="1985" min="1985" max="2024" step="1" />
+              </div>
+              <div style="display:flex;align-items:center;gap:0.35rem;">
+                <span style="font-size:0.74rem;color:var(--text-secondary);">Do:</span>
+                <input type="number" id="histRangeEndInput" class="input-control" value="2026" min="1987" max="2026" step="1" />
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Wybór miary na histogramie -->
+          <div>
+            <div class="form-label">
+              <span>Analizowana miara wyniku <span class="info-tip" data-tip-title="Miara Wyniku na Histogramie" data-tip-body="• Całkowity zwrot Netto (%): o ile procent końcowa wartość portfela (po podatku) przewyższyła sumę wpłaconych przez Ciebie pieniędzy.<br>• Średnioroczny zwrot CAGR (%): roczne tempo wzrostu portfela.<br>• Zysk / Strata w PLN: kwota czystego zysku lub straty w złotówkach." data-tip-hint="Przełącz miarę, aby badać procentowy zwrot, roczny CAGR lub konkretne złotówki.">?</span></span>
+            </div>
+            <select id="nYearMetricSelect" class="select-control">
+              <option value="totalReturnPct" selected>Całkowity zwrot z kapitału Netto (%)</option>
+              <option value="cagr">Średnioroczna stopa zwrotu CAGR (%)</option>
+              <option value="profitPLN">Czysty Zysk / Strata Netto (PLN)</option>
+            </select>
+          </div>
+
+          <!-- 4. Zadany próg zysku lub straty -->
+          <div>
+            <div class="form-label">
+              <span>Twój zadany próg zysku/straty <span class="info-tip" data-tip-title="Zadany Próg Zysku lub Straty" data-tip-body="Wpisz dowolny interesujący Cię wynik (np. +50% zysku, +100% podwojenie kapitału, 0% wyjście na zero, albo -15% straty). Symulator policzy w ilu dokładnie N-letnich okresach z historii wynik był wyższy lub niższy od tej wartości!" data-tip-hint="Próg jest zaznaczony żółtą przerywaną linią bezpośrednio na histogramie.">?</span></span>
+              <span class="form-value text-amber" id="targetReturnVal">+50%</span>
+            </div>
+            <div class="input-row" style="align-items:center;">
+              <input type="number" id="targetReturnInput" class="input-control" value="50" step="5" />
+              <input type="range" id="targetReturnRange" min="-50" max="300" step="5" value="50" />
+            </div>
+          </div>
+        </div>
+
+        <div class="dual-grid">
+          <!-- Lewa kolumna: Histogram potencjalnych zwrotów + Percentyle -->
+          <div>
+            <h3 style="font-size:0.88rem;font-weight:700;margin-bottom:0.5rem;color:#f8fafc;display:flex;justify-content:space-between;align-items:center;">
+              <span>📊 Histogram potencjalnych zwrotów dla okresów N-letnich</span>
+              <span style="font-size:0.72rem;font-weight:400;color:var(--text-secondary);">Najedź na słupek, by zobaczyć daty</span>
+            </h3>
+            <div class="chart-wrapper-sm" style="height:285px;">
+              <canvas id="nYearHistogramCanvas" class="chart-canvas"></canvas>
+              <div id="nYearHistogramTooltip" class="chart-tooltip"></div>
+            </div>
+            <div class="chart-legend" style="margin-top:0.55rem;margin-bottom:0.85rem;">
+              <div class="legend-item"><span class="legend-swatch" style="background:#f43f5e"></span><span>Twój: Strata (&lt; 0)</span></div>
+              <div class="legend-item"><span class="legend-swatch" style="background:#3b82f6"></span><span>Twój: Zysk &lt; próg</span></div>
+              <div class="legend-item"><span class="legend-swatch" style="background:#10b981"></span><span>Twój: Zysk ≥ próg</span></div>
+              <div class="legend-item"><span class="legend-swatch" style="background:#22d3ee"></span><span>100% Obligacje EDO (bezpieczny)</span></div>
+              <div class="legend-item"><span class="legend-swatch" style="background:#fbbf24"></span><span>Twój próg</span></div>
+              <div class="legend-item"><span class="legend-swatch" style="background:#c084fc"></span><span>Mediana Twoja</span></div>
+            </div>
+
+            <!-- Kafelki percentylowe (10%, Mediana 50%, Średnia, 90%) -->
+            <div id="nYearPercentilesBox" style="display:grid;grid-template-columns:repeat(4, 1fr);gap:0.5rem;"></div>
+          </div>
+
+          <!-- Prawa kolumna: Wynik dla zadanego progu + Tabela szans na poszczególne zyski/straty -->
+          <div>
+            <h3 style="font-size:0.88rem;font-weight:700;margin-bottom:0.5rem;color:#f8fafc;">
+              🎲 Szansa na zadany zysk lub stratę po N latach (na podstawie historii)
+            </h3>
+
+            <!-- Główny boks odpowiedzi dla zadanego progu -->
+            <div id="customTargetProbabilityBox" style="margin-bottom:0.9rem;"></div>
+
+            <!-- Rozkład szans dla standardowych progów -->
+            <div style="font-size:0.76rem;font-weight:600;color:var(--text-secondary);margin-bottom:0.45rem;">
+              Rozkład szans dla kluczowych progów całkowitego zwrotu po <span id="tableNYearsSpan">10</span> latach:
+            </div>
+            <div id="quickThresholdsContainer"></div>
+          </div>
+        </div>
+      </section>
+
       <!-- SEKCJA: GŁĘBOKA ANALIZA OBSUNIĘĆ (DRAWDOWN), SZANSY NA SPADKI I OKIEN HISTORYCZNYCH (1985–2026) -->
       <section class="card">
         <div class="card-header">

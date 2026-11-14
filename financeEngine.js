@@ -269,7 +269,8 @@ export function simulatePortfolio(config, marketEnv) {
     indexationMode = 'annual',
     taxAccount = 'standard',
     ikzeTaxBracket = 12,
-    rebalanceMode = 'contributions'
+    rebalanceMode = 'contributions',
+    summaryOnly = false
   } = config;
 
   const {
@@ -601,29 +602,31 @@ export function simulatePortfolio(config, marketEnv) {
       maxCapitalDrawdown = capDd;
     }
 
-    timeline.push({
-      month: monthNumber,
-      year: +(monthNumber / 12).toFixed(2),
-      calendarYear,
-      ym,
-      label: ym,
-      contributedNominal: totalContributedNominal,
-      contributedReal: totalContributedReal,
-      monthlyContributionActual: currentMonthlyContribution,
-      grossValue: grossValue + totalTaxPaidMidTerm,
-      portfolioGrossCurrent: grossValue,
-      netValue,
-      realNetValue,
-      liquidationTax,
-      totalTaxCost: totalTaxPaidMidTerm + liquidationTax,
-      ikzePitRefunds: totalIkzePitRefunds,
-      drawdown: unitDd,          // Rynkowe obsunięcie jednostki portfela (TWR %)
-      capitalDrawdown: capDd,    // Obsunięcie kapitału z uwzględnieniem wpłat (%)
-      unitNav,
-      monthlyReturnPct: mRet * 100,
-      inflationFactor: cumulativeInflationFactor,
-      assetBreakdown: getBreakdownSnapshot()
-    });
+    if (!summaryOnly || m === totalMonths - 1) {
+      timeline.push({
+        month: monthNumber,
+        year: +(monthNumber / 12).toFixed(2),
+        calendarYear,
+        ym,
+        label: ym,
+        contributedNominal: totalContributedNominal,
+        contributedReal: totalContributedReal,
+        monthlyContributionActual: currentMonthlyContribution,
+        grossValue: grossValue + totalTaxPaidMidTerm,
+        portfolioGrossCurrent: grossValue,
+        netValue,
+        realNetValue,
+        liquidationTax,
+        totalTaxCost: totalTaxPaidMidTerm + liquidationTax,
+        ikzePitRefunds: totalIkzePitRefunds,
+        drawdown: unitDd,          // Rynkowe obsunięcie jednostki portfela (TWR %)
+        capitalDrawdown: capDd,    // Obsunięcie kapitału z uwzględnieniem wpłat (%)
+        unitNav,
+        monthlyReturnPct: mRet * 100,
+        inflationFactor: cumulativeInflationFactor,
+        assetBreakdown: summaryOnly ? null : getBreakdownSnapshot()
+      });
+    }
   }
 
   const finalPoint = timeline[timeline.length - 1];
@@ -891,3 +894,335 @@ export function analyzeHistoricalRiskAndDrawdowns(weights, edoMargin = 1.5, hori
     calendarYearReturns
   };
 }
+
+/**
+ * Symuluje WSZYSTKIE możliwe N-letnie okresy inwestycyjne (zaczynające się w każdym kolejnym miesiącu)
+ * w zadanym przez użytkownika podzakresie lat historycznych [rangeStartYear, rangeEndYear].
+ * Wylicza pełny rozkład zwrotów (histogram), percentyle oraz dokładne prawdopodobieństwo (szansę)
+ * osiągnięcia zadanego progu zysku/straty (targetReturn) oraz obsunięcia (targetMaxDD).
+ */
+export function runRollingNYearAnalysis(params) {
+  const {
+    weights,
+    nYears = 10,
+    rangeStartYear = 1985,
+    rangeEndYear = 2026,
+    initialCapital = 10000,
+    monthlyContribution = 1500,
+    indexContributions = true,
+    indexationMode = 'annual',
+    taxAccount = 'standard',
+    ikzeTaxBracket = 12,
+    rebalanceMode = 'contributions',
+    edoYear1Rate = 6.55,
+    edoMargin = 1.50,
+    useUsd = false,
+    isReal = false,
+    metric = 'totalReturnPct', // 'totalReturnPct' | 'cagr' | 'profitPLN'
+    targetValue = 50,          // zadany przez użytkownika próg zysku/straty (% lub PLN)
+    targetMaxDD = 20           // zadany próg obsunięcia w trakcie trwania inwestycji (%)
+  } = params;
+
+  const sYear = Math.min(rangeStartYear, rangeEndYear - 1);
+  const eYear = Math.max(rangeStartYear + 1, rangeEndYear);
+
+  // Filtruj klucze miesięczne z wybranego zakresu lat
+  const availableKeys = ALL_HISTORICAL_MONTH_KEYS.filter((ym) => {
+    const y = parseInt(ym.slice(0, 4), 10);
+    return y >= sYear && y <= eYear;
+  });
+
+  const maxPossibleYears = Math.max(1, Math.floor((availableKeys.length - 1) / 12));
+  const effectiveNYears = Math.max(1, Math.min(nYears, maxPossibleYears));
+  const windowMonths = effectiveNYears * 12;
+
+  const windows = [];
+  const edoWeights = { sp500: 0, nasdaq100: 0, msci_world: 0, msci_momentum: 0, msci_acwi: 0, edo: 100 };
+
+  for (let i = 0; i <= availableKeys.length - windowMonths; i++) {
+    const sliceKeys = availableKeys.slice(i, i + windowMonths);
+    const startYM = sliceKeys[0];
+    const endYM = sliceKeys[sliceKeys.length - 1];
+    const startY = parseInt(startYM.slice(0, 4), 10);
+    const startM = parseInt(startYM.slice(5, 7), 10);
+    const endY = parseInt(endYM.slice(0, 4), 10);
+    const endM = parseInt(endYM.slice(5, 7), 10);
+
+    const monthlyInflation = [];
+    const monthlyAssetReturns = {};
+    EQUITY_IDS.forEach((id) => {
+      monthlyAssetReturns[id] = [];
+    });
+
+    for (let m = 0; m < windowMonths; m++) {
+      const rec = HISTORICAL_MONTHLY_DATA[sliceKeys[m]];
+      monthlyInflation.push(Math.max(-0.02, (rec?.cpi ?? 3.5) / 100));
+      EQUITY_IDS.forEach((id) => {
+        const k = useUsd ? `${id}_usd` : id;
+        monthlyAssetReturns[id].push(rec?.[k] ?? rec?.[id] ?? 0);
+      });
+    }
+
+    const env = {
+      startYear: startY,
+      startMonth: startM,
+      endYear: endY,
+      endMonth: endM,
+      startYM,
+      endYM,
+      totalMonths: windowMonths,
+      monthlyDates: sliceKeys,
+      monthlyInflation,
+      monthlyAssetReturns,
+      edoYear1Rate: edoYear1Rate / 100,
+      edoMargin: edoMargin / 100
+    };
+
+    const sim = simulatePortfolio({
+      weights,
+      initialCapital,
+      monthlyContribution,
+      indexContributions,
+      indexationMode,
+      taxAccount,
+      ikzeTaxBracket,
+      rebalanceMode,
+      summaryOnly: true
+    }, env);
+
+    const edoSim = simulatePortfolio({
+      weights: edoWeights,
+      initialCapital,
+      monthlyContribution,
+      indexContributions,
+      indexationMode,
+      taxAccount,
+      ikzeTaxBracket,
+      rebalanceMode: 'none',
+      summaryOnly: true
+    }, env);
+
+    const sum = sim.summary;
+    const contributed = isReal ? sum.contributedReal : sum.contributedNominal;
+    const finalNet = isReal ? sum.realNetFinalValue : sum.netFinalValue;
+    const profitPLN = finalNet - contributed;
+    const totalReturnPct = contributed > 0
+      ? ((finalNet - contributed) / contributed) * 100
+      : (Math.pow(1 + sum.cagr / 100, effectiveNYears) - 1) * 100;
+
+    const realCagr = (((1 + sum.cagr / 100) / Math.pow(sum.finalInflationFactor || 1, 1 / effectiveNYears)) - 1) * 100;
+    const cagrVal = isReal ? realCagr : sum.cagr;
+
+    const edoSum = edoSim.summary;
+    const edoContributed = isReal ? edoSum.contributedReal : edoSum.contributedNominal;
+    const edoFinalNet = isReal ? edoSum.realNetFinalValue : edoSum.netFinalValue;
+    const edoProfitPLN = edoFinalNet - edoContributed;
+    const edoTotalReturnPct = edoContributed > 0
+      ? ((edoFinalNet - edoContributed) / edoContributed) * 100
+      : (Math.pow(1 + edoSum.cagr / 100, effectiveNYears) - 1) * 100;
+    const edoRealCagr = (((1 + edoSum.cagr / 100) / Math.pow(edoSum.finalInflationFactor || 1, 1 / effectiveNYears)) - 1) * 100;
+    const edoCagrVal = isReal ? edoRealCagr : edoSum.cagr;
+
+    windows.push({
+      startYM,
+      endYM,
+      contributed,
+      finalNet,
+      profitPLN,
+      totalReturnPct,
+      cagr: cagrVal,
+      maxDD: sum.maxDrawdown,
+      maxCapitalDD: sum.maxCapitalDrawdown,
+      // Wyniki bezpiecznego benchmarku 100% EDO w tym samym oknie
+      edoFinalNet,
+      edoProfitPLN,
+      edoTotalReturnPct,
+      edoCagr: edoCagrVal,
+      beatEdo: finalNet >= edoFinalNet,
+      excessProfitPLN: finalNet - edoFinalNet,
+      excessReturnPct: totalReturnPct - edoTotalReturnPct,
+      excessCagr: cagrVal - edoCagrVal
+    });
+  }
+
+  const totalCount = windows.length || 1;
+  const getMetricVal = (w) => {
+    if (metric === 'cagr') return w.cagr;
+    if (metric === 'profitPLN') return w.profitPLN;
+    return w.totalReturnPct;
+  };
+  const getEdoMetricVal = (w) => {
+    if (metric === 'cagr') return w.edoCagr;
+    if (metric === 'profitPLN') return w.edoProfitPLN;
+    return w.edoTotalReturnPct;
+  };
+
+  const sortedByMetric = [...windows].sort((a, b) => getMetricVal(a) - getMetricVal(b));
+  const values = sortedByMetric.map(getMetricVal);
+
+  const sortedEdoByMetric = [...windows].sort((a, b) => getEdoMetricVal(a) - getEdoMetricVal(b));
+  const edoValues = sortedEdoByMetric.map(getEdoMetricVal);
+
+  const getPercentileObj = (p, arr = sortedByMetric) => {
+    if (!arr.length) return null;
+    const idx = Math.min(arr.length - 1, Math.max(0, Math.floor((p / 100) * (arr.length - 1))));
+    return arr[idx];
+  };
+
+  const minVal = Math.min(values[0] ?? 0, edoValues[0] ?? 0);
+  const maxVal = Math.max(values[values.length - 1] ?? 0, edoValues[edoValues.length - 1] ?? 0);
+  const meanVal = values.reduce((a, b) => a + b, 0) / totalCount;
+  const medianObj = getPercentileObj(50);
+  const p10Obj = getPercentileObj(10);
+  const p25Obj = getPercentileObj(25);
+  const p75Obj = getPercentileObj(75);
+  const p90Obj = getPercentileObj(90);
+
+  // Statystyki dla bezpiecznego portfela 100% EDO
+  const edoMinVal = edoValues[0] ?? 0;
+  const edoMaxVal = edoValues[edoValues.length - 1] ?? 0;
+  const edoMeanVal = edoValues.reduce((a, b) => a + b, 0) / totalCount;
+  const edoMedianObj = getPercentileObj(50, sortedEdoByMetric);
+  const edoP10Obj = getPercentileObj(10, sortedEdoByMetric);
+  const edoP90Obj = getPercentileObj(90, sortedEdoByMetric);
+
+  const beatEdoCount = windows.filter((w) => w.finalNet >= w.edoFinalNet).length;
+  const probBeatEdo = (beatEdoCount / totalCount) * 100;
+  const edoHitsAboveOrEqual = windows.filter((w) => getEdoMetricVal(w) >= targetValue).length;
+  const edoProbAboveOrEqual = (edoHitsAboveOrEqual / totalCount) * 100;
+
+  // Wyliczenie szans dla zadanego targetValue oraz progów standardowych
+  const hitsAboveOrEqual = windows.filter((w) => getMetricVal(w) >= targetValue).length;
+  const hitsBelow = totalCount - hitsAboveOrEqual;
+  const probAboveOrEqual = (hitsAboveOrEqual / totalCount) * 100;
+  const probBelow = (hitsBelow / totalCount) * 100;
+
+  const lossCount = windows.filter((w) => w.profitPLN < 0).length;
+  const probAnyLoss = (lossCount / totalCount) * 100;
+  const probPositive = 100 - probAnyLoss;
+
+  const ddHits = windows.filter((w) => w.maxDD <= -Math.abs(targetMaxDD)).length;
+  const probMaxDDWorse = (ddHits / totalCount) * 100;
+
+  // Tabela szybkich progów szans na zysk / stratę (Twój Portfel vs 100% EDO)
+  const quickThresholds = [
+    { label: 'Strata głębsza niż -20%', cond: (v) => v <= -20, type: 'loss' },
+    { label: 'Strata głębsza niż -10%', cond: (v) => v <= -10, type: 'loss' },
+    { label: 'Jakakolwiek strata (< 0%)', cond: (v) => v < 0, type: 'loss' },
+    { label: 'Wyjście na plus (> 0%)', cond: (v) => v > 0, type: 'gain' },
+    { label: 'Zysk co najmniej +25%', cond: (v) => v >= 25, type: 'gain' },
+    { label: 'Zysk co najmniej +50%', cond: (v) => v >= 50, type: 'gain' },
+    { label: 'Podwojenie kapitału (≥ +100%)', cond: (v) => v >= 100, type: 'gain' },
+    { label: 'Potrojenie kapitału (≥ +200%)', cond: (v) => v >= 200, type: 'gain' }
+  ].map((t) => {
+    const count = windows.filter((w) => t.cond(w.totalReturnPct)).length;
+    const edoCount = windows.filter((w) => t.cond(w.edoTotalReturnPct)).length;
+    return {
+      label: t.label,
+      type: t.type,
+      count,
+      prob: (count / totalCount) * 100,
+      edoCount,
+      edoProb: (edoCount / totalCount) * 100
+    };
+  });
+
+  // Budowa koszyków histogramu (wspólna oś X dla Twojego Portfela oraz 100% EDO)
+  const binCount = Math.min(16, Math.max(8, Math.round(Math.sqrt(totalCount))));
+  const span = maxVal - minVal || 10;
+  const step = span / binCount;
+  const bins = [];
+
+  for (let b = 0; b < binCount; b++) {
+    const bMin = minVal + b * step;
+    const bMax = b === binCount - 1 ? maxVal : minVal + (b + 1) * step;
+    const bCenter = (bMin + bMax) / 2;
+    bins.push({
+      binIndex: b,
+      min: bMin,
+      max: bMax,
+      center: bCenter,
+      count: 0,
+      pct: 0,
+      edoCount: 0,
+      edoPct: 0,
+      isLoss: bCenter < 0,
+      meetsTarget: bCenter >= targetValue,
+      samples: [],
+      edoSamples: []
+    });
+  }
+
+  windows.forEach((w) => {
+    const v = getMetricVal(w);
+    let idx = Math.floor(((v - minVal) / span) * binCount);
+    if (idx >= binCount) idx = binCount - 1;
+    if (idx < 0) idx = 0;
+    bins[idx].count += 1;
+    if (bins[idx].samples.length < 3) {
+      bins[idx].samples.push(`${w.startYM}→${w.endYM}`);
+    }
+
+    const ev = getEdoMetricVal(w);
+    let eIdx = Math.floor(((ev - minVal) / span) * binCount);
+    if (eIdx >= binCount) eIdx = binCount - 1;
+    if (eIdx < 0) eIdx = 0;
+    bins[eIdx].edoCount += 1;
+    if (bins[eIdx].edoSamples.length < 2) {
+      bins[eIdx].edoSamples.push(`${w.startYM}→${w.endYM}`);
+    }
+  });
+
+  bins.forEach((b) => {
+    b.pct = (b.count / totalCount) * 100;
+    b.edoPct = (b.edoCount / totalCount) * 100;
+  });
+
+  return {
+    requestedNYears: nYears,
+    effectiveNYears,
+    wasClamped: effectiveNYears !== nYears,
+    rangeStartYear: sYear,
+    rangeEndYear: eYear,
+    firstAvailableYM: availableKeys[0] || '-',
+    lastAvailableYM: availableKeys[availableKeys.length - 1] || '-',
+    totalWindows: windows.length,
+    metric,
+    targetValue,
+    targetMaxDD,
+    hitsAboveOrEqual,
+    hitsBelow,
+    probAboveOrEqual,
+    probBelow,
+    probAnyLoss,
+    probPositive,
+    probMaxDDWorse,
+    ddHits,
+    minVal,
+    maxVal,
+    meanVal,
+    worstWindow: sortedByMetric[0] || null,
+    bestWindow: sortedByMetric[sortedByMetric.length - 1] || null,
+    p10Window: p10Obj,
+    p25Window: p25Obj,
+    medianWindow: medianObj,
+    p75Window: p75Obj,
+    p90Window: p90Obj,
+    // Statystyki benchmarku 100% EDO
+    edoMinVal,
+    edoMaxVal,
+    edoMeanVal,
+    edoWorstWindow: sortedEdoByMetric[0] || null,
+    edoBestWindow: sortedEdoByMetric[sortedEdoByMetric.length - 1] || null,
+    edoP10Window: edoP10Obj,
+    edoMedianWindow: edoMedianObj,
+    edoP90Window: edoP90Obj,
+    beatEdoCount,
+    probBeatEdo,
+    edoHitsAboveOrEqual,
+    edoProbAboveOrEqual,
+    quickThresholds,
+    bins
+  };
+}
+
